@@ -1,1 +1,78 @@
-"use strict";const{app:u,BrowserWindow:m,ipcMain:l}=require("electron"),d=require("path"),o=require("fs"),_=require("temp");process.env.ELECTRON_DISABLE_SECURITY_WARNINGS="true";let p=null,c=null;const y=()=>{p=new m({width:800,height:600,webPreferences:{nodeIntegration:!1,contextIsolation:!0,preload:d.join(__dirname,"preload.js")}}),process.env.VITE_DEV_SERVER_URL?p.loadURL(process.env.VITE_DEV_SERVER_URL):p.loadFile(d.join(__dirname,"../dist/index.html"))},{convertWordToPdfWithOffice:E,checkWordInstallation:R}=require("./officeConverter");require("os");async function v(){if(c&&!c.isDestroyed())return c;c=new m({show:!1,width:1200,height:1700,webPreferences:{preload:d.join(__dirname,"preload.js"),contextIsolation:!0,nodeIntegration:!1}});const t=process.env.VITE_DEV_SERVER_URL?`${process.env.VITE_DEV_SERVER_URL}#/hidden-print`:`file://${d.join(__dirname,"../dist/index.html")}#/hidden-print`;return await c.loadURL(t),c}async function I(t){const s=[],r=await v();try{for(const[e,n]of t.entries()){console.log(`正在转换第 ${e+1}/${t.length} 个文件: ${n.name}`),r.webContents.send("render-docx",n.buffer),await new Promise((i,h)=>{const f=()=>{l.removeListener("render-done",w),l.removeListener("render-error",g)},w=()=>{f(),i()},g=(P,S)=>{f(),h(new Error(S))};l.on("render-done",w),l.on("render-error",g),setTimeout(()=>{f(),console.error(`File ${n.name} timeout`),i()},5e3)});const a=await r.webContents.printToPDF({printBackground:!0,pageSize:"A4",margins:{top:0,bottom:0,left:0,right:0},scale:1,preferCSSPageSize:!0,printSelectionOnly:!1,landscape:!1,pageRanges:"",ignoreInvalidPageRanges:!0,displayHeaderFooter:!1,headerTemplate:"",footerTemplate:"",generateTaggedPDF:!0,optimizeForSpeed:!1});s.push({name:n.name.replace(".docx",".pdf"),data:a})}return{success:!0,results:s}}catch(e){return console.error("批量转换错误:",e),{success:!1,error:e.message}}finally{r&&r.destroy(),c=null}}async function x(t){const s=[];try{if(!R())return{success:!1,error:"未检测到Microsoft Word安装"};for(const[r,e]of t.entries()){console.log(`正在使用Office转换第 ${r+1}/${t.length} 个文件: ${e.name}`);const n=_.mkdirSync("autodocgenius"),a=d.join(n,e.name),i=d.join(n,e.name.replace(".docx",".pdf"));try{if(o.writeFileSync(a,Buffer.from(e.buffer)),E(a,i)&&o.existsSync(i)){const f=o.readFileSync(i);s.push({name:e.name.replace(".docx",".pdf"),data:f})}else return console.error(`转换失败: ${e.name}`),{success:!1,error:`转换失败: ${e.name}`}}finally{o.existsSync(a)&&o.unlinkSync(a),o.existsSync(i)&&o.unlinkSync(i),o.existsSync(n)&&o.rmSync(n,{recursive:!0,force:!0})}}return{success:!0,results:s}}catch(r){return console.error("Office批量转换错误:",r),{success:!1,error:r.message}}}l.handle("batch-convert-pdf",async(t,s,r={})=>{const{method:e="render"}=r;return e==="office"?x(s):I(s)});l.handle("check-office-installation",()=>R());u.whenReady().then(y);u.on("window-all-closed",()=>{process.platform!=="darwin"&&u.quit()});u.on("activate",()=>{m.getAllWindows().length===0&&y()});
+"use strict";
+const { app, BrowserWindow, ipcMain } = require("electron");
+const path = require("path");
+const fs = require("fs");
+const temp = require("temp");
+const {
+  convertWordToPdfWithOffice,
+  checkWordInstallation
+} = require("./officeConverter");
+process.env.ELECTRON_DISABLE_SECURITY_WARNINGS = "true";
+let mainWindow = null;
+const createWindow = () => {
+  mainWindow = new BrowserWindow({
+    width: 800,
+    height: 600,
+    webPreferences: {
+      nodeIntegration: false,
+      contextIsolation: true,
+      preload: path.join(__dirname, "preload.js")
+    }
+  });
+  if (process.env.VITE_DEV_SERVER_URL) {
+    mainWindow.loadURL(process.env.VITE_DEV_SERVER_URL);
+  } else {
+    mainWindow.loadFile(path.join(__dirname, "../dist/index.html"));
+  }
+};
+async function convertPdfByOffice(docxFiles) {
+  const pdfResults = [];
+  try {
+    if (!checkWordInstallation()) {
+      return { success: false, error: "未检测到Microsoft Word安装" };
+    }
+    for (const [_index, file] of docxFiles.entries()) {
+      const tempDir = temp.mkdirSync("autodocgenius");
+      const docxPath = path.join(tempDir, file.name);
+      const pdfPath = path.join(tempDir, file.name.replace(".docx", ".pdf"));
+      try {
+        fs.writeFileSync(docxPath, Buffer.from(file.buffer));
+        const success = convertWordToPdfWithOffice(docxPath, pdfPath);
+        if (success && fs.existsSync(pdfPath)) {
+          const pdfBuffer = fs.readFileSync(pdfPath);
+          pdfResults.push({
+            name: file.name.replace(".docx", ".pdf"),
+            data: pdfBuffer
+          });
+        } else {
+          return { success: false, error: `转换失败: ${file.name}` };
+        }
+      } finally {
+        if (fs.existsSync(docxPath)) fs.unlinkSync(docxPath);
+        if (fs.existsSync(pdfPath)) fs.unlinkSync(pdfPath);
+        if (fs.existsSync(tempDir))
+          fs.rmSync(tempDir, { recursive: true, force: true });
+      }
+    }
+    return { success: true, results: pdfResults };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+}
+ipcMain.handle("batch-convert-pdf", async (event, docxFiles, options = {}) => {
+  return convertPdfByOffice(docxFiles);
+});
+ipcMain.handle("check-office-installation", () => {
+  return checkWordInstallation();
+});
+app.whenReady().then(createWindow);
+app.on("window-all-closed", () => {
+  if (process.platform !== "darwin") {
+    app.quit();
+  }
+});
+app.on("activate", () => {
+  if (BrowserWindow.getAllWindows().length === 0) {
+    createWindow();
+  }
+});

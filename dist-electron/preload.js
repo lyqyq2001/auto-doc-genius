@@ -1,1 +1,8 @@
-"use strict";const{contextBridge:c,ipcRenderer:n}=require("electron");c.exposeInMainWorld("electronAPI",{convertBatchToPdf:(e,r)=>n.invoke("batch-convert-pdf",e,r),checkOfficeInstallation:()=>n.invoke("check-office-installation"),onRenderDocx:e=>n.on("render-docx",(r,o)=>e(o)),sendRenderDone:()=>n.send("render-done"),sendRenderError:e=>n.send("render-error",e)});
+"use strict";
+const { contextBridge, ipcRenderer } = require("electron");
+contextBridge.exposeInMainWorld("electronAPI", {
+  // 批量转换PDF，支持options参数
+  convertBatchToPdf: (files, options) => ipcRenderer.invoke("batch-convert-pdf", files, options),
+  // 检查Office是否安装
+  checkOfficeInstallation: () => ipcRenderer.invoke("check-office-installation")
+});
