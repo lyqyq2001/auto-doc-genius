@@ -1,5 +1,3 @@
-<!-- Excel转Word批量生成器 -->
-<!-- 所需依赖：npm install xlsx docxtemplater pizzip jszip file-saver element-plus -->
 
 <template>
   <div class="app-container">
@@ -62,14 +60,37 @@
 
       <!-- 操作区域 -->
       <el-card class="operation-card">
+        <!-- 导出格式选择 -->
+        <div class="export-options">
+          <el-radio-group v-model="exportFormat" size="large">
+            <el-radio-button label="docx">导出Word</el-radio-button>
+            <el-radio-button label="pdf">导出PDF</el-radio-button>
+          </el-radio-group>
+        </div>
+
         <el-button
           type="primary"
           :loading="generating"
-          :disabled="!excelFile || !wordFile || generating"
+          :disabled="
+            !excelFile ||
+            !wordFile ||
+            generating ||
+            (exportFormat === 'pdf' && !officeInstalled)
+          "
           @click="startGenerate"
           size="large"
         >
-          {{ generating ? '生成中...' : '开始生成Word文件' }}
+          {{
+            generating
+              ? '生成中...'
+              : `开始生成${exportFormat === 'docx' ? 'Word' : 'PDF'}文件`
+          }}
+          <span
+            v-if="exportFormat === 'pdf' && !officeInstalled"
+            style="color: #f56c6c; font-size: 14px"
+          >
+            (未安装Office，无法生成PDF)</span
+          >
         </el-button>
 
         <!-- 进度条 -->
@@ -87,7 +108,7 @@
 </template>
 
 <script setup>
-  import { ref, reactive } from 'vue';
+  import { ref } from 'vue';
   import { ElMessage, ElNotification } from 'element-plus';
   import * as XLSX from 'xlsx';
   import PizZip from 'pizzip';
@@ -104,8 +125,27 @@
   const generating = ref(false);
   const progress = ref(0);
   const progressText = ref('');
-  // 导出格式，只保留docx
+  // 导出格式，默认docx
   const exportFormat = ref('docx');
+  // Office是否安装
+  const officeInstalled = ref(false);
+
+  // 检查Office是否安装
+  const checkOfficeInstallation = async () => {
+    try {
+      if (window.electronAPI && window.electronAPI.checkOfficeInstallation) {
+        officeInstalled.value =
+          await window.electronAPI.checkOfficeInstallation();
+        console.log('Office安装状态:', officeInstalled.value);
+      }
+    } catch (error) {
+      console.error('检查Office安装状态失败:', error);
+      officeInstalled.value = false;
+    }
+  };
+
+  // 组件挂载时检查Office安装状态
+  checkOfficeInstallation();
 
   // Excel文件上传前校验
   const beforeExcelUpload = (file) => {
@@ -145,45 +185,6 @@
   const handleWordChange = (file, fileList) => {
     wordFile.value = file.raw;
     wordFileList.value = fileList;
-  };
-
-  // 测试Word文件上传处理
-  const handleTestDocxChange = (file, fileList) => {
-    testDocxFile.value = file.raw;
-    testDocxFileList.value = fileList;
-  };
-
-  // LibreOffice转换测试
-  const testLibreOfficeConvert = async () => {
-    if (!testDocxFile.value) {
-      ElMessage.warning('请先上传Word文件');
-      return;
-    }
-
-    converting.value = true;
-
-    try {
-      if (window.electronAPI) {
-        // 直接使用文件路径进行转换（这里简化处理，实际应用中需要先保存文件）
-        // 注意：实际应用中需要先将上传的文件保存到本地，然后再调用转换API
-        const result = await window.electronAPI.convertDocxToPdf(
-          testDocxFile.value.path || testDocxFile.value.name
-        );
-
-        ElNotification.success({
-          title: '成功',
-          message: `PDF转换成功！文件路径：${result.pdfPath}`,
-          duration: 5000,
-        });
-      } else {
-        ElMessage.error('Electron API未加载，请在Electron环境中运行');
-      }
-    } catch (error) {
-      console.error('转换失败:', error);
-      ElMessage.error(`转换失败: ${error.message}`);
-    } finally {
-      converting.value = false;
-    }
   };
 
   // 解析Excel文件
@@ -263,28 +264,7 @@
               }
 
               obj[header] = value;
-
-              // 添加别名处理，解决XXX01和XXX11的匹配问题
-              // 如果表头是XXX01，同时添加XXX11作为别名
-              if (header === 'XXX01') {
-                console.log('为XXX01添加别名XXX11，值为:', value);
-                obj['XXX11'] = value;
-              }
-              // 如果表头是XXX11，同时添加XXX01作为别名
-              else if (header === 'XXX11') {
-                console.log('为XXX11添加别名XXX01，值为:', value);
-                obj['XXX01'] = value;
-              }
             });
-
-            // 额外添加所有可能的XXX01-XXX11别名，确保所有情况都能匹配
-            // 检查是否有XXX01或XXX11字段，互相添加别名
-            if (obj['XXX01'] && !obj['XXX11']) {
-              obj['XXX11'] = obj['XXX01'];
-            }
-            if (obj['XXX11'] && !obj['XXX01']) {
-              obj['XXX01'] = obj['XXX11'];
-            }
 
             return obj;
           });
@@ -337,6 +317,9 @@
 
       // 创建JSZip实例
       const zip = new JSZip();
+
+      // 定义一个临时数组存放生成的 docx buffer
+      const tempDocxList = [];
 
       // 遍历Excel数据行
       for (let i = 0; i < totalRows; i++) {
@@ -396,12 +379,6 @@
           }
         });
 
-        // 查看当前模板中包含的占位符
-        console.log(
-          '模板中的XML文件列表:',
-          Object.keys(templateZip.files).filter((f) => f.endsWith('.xml'))
-        );
-
         // 创建docxtemplater实例，配置支持{字段名}格式的占位符
         const doc = new Docxtemplater(templateZip, {
           paragraphLoop: true,
@@ -413,31 +390,11 @@
           },
         });
 
-        // 查看要填充的数据
-        console.log('要填充的数据:', rowData);
-
-        // 检查数据中是否包含XXX01字段
-        if (rowData.XXX01) {
-          console.log('数据中包含XXX01字段，值为:', rowData.XXX01);
-        } else {
-          console.log('数据中不包含XXX01字段');
-          // 检查是否有大小写问题或其他命名问题
-          console.log('数据中的所有字段:', Object.keys(rowData));
-        }
-
-        // 填充数据
-        console.log('最终要填充的数据:', rowData);
-
-        // 确保XXX01字段被正确处理
-        if (rowData.XXX01) {
-          console.log('正在填充XXX01字段，值为:', rowData.XXX01);
-        }
-
         doc.render(rowData);
 
-        // 生成Word文件
-        const docxBlob = doc.getZip().generate({
-          type: 'blob',
+        // 生成Word文件，使用arraybuffer格式，方便后续转换
+        const docxArrayBuffer = doc.getZip().generate({
+          type: 'arraybuffer',
           mimeType:
             'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
         });
@@ -447,7 +404,47 @@
         const baseFileName = rowData[firstKey] || `doc_${i + 1}`;
 
         // 直接添加Word文件到ZIP中
-        zip.file(`${baseFileName}.docx`, docxBlob);
+        if (exportFormat.value === 'docx') {
+          zip.file(`${baseFileName}.docx`, docxArrayBuffer);
+        } else if (exportFormat.value === 'pdf') {
+          // 导出PDF：先存起来，稍后批量发给主进程
+          tempDocxList.push({
+            name: `${baseFileName}.docx`,
+            buffer: docxArrayBuffer,
+          });
+        }
+      }
+
+      // === 循环结束后的逻辑 ===
+
+      // 如果是 PDF 模式，开始调用主进程转换
+      if (exportFormat.value === 'pdf' && tempDocxList.length > 0) {
+        progress.value = 100;
+        progressText.value = '正在使用微软Office进行 Word 转 PDF，请稍候...';
+
+        try {
+          // 调用主进程 API
+          // 注意：如果文件特别多（几百个），建议分批次发送，避免 IPC 通道阻塞
+          const result = await window.electronAPI.convertBatchToPdf(
+            tempDocxList,
+            {
+              method: 'office',
+            }
+          );
+
+          if (result.success) {
+            // 将返回的 PDF Buffer 加入 ZIP
+            result.results.forEach((pdfFile) => {
+              zip.file(pdfFile.name, pdfFile.data);
+            });
+          } else {
+            throw new Error(result.error);
+          }
+        } catch (e) {
+          ElMessage.error('PDF转换出错: ' + e.message);
+          generating.value = false;
+          return;
+        }
       }
 
       // 完成进度
@@ -458,14 +455,19 @@
       const zipBlob = await zip.generateAsync({ type: 'blob' });
 
       // 生成ZIP文件名
-      const zipFileName = '生成的Word文件.zip';
+      const zipFileName =
+        exportFormat.value === 'docx'
+          ? '生成的Word文件.zip'
+          : '生成的PDF文件.zip';
 
       // 下载ZIP文件
       saveAs(zipBlob, zipFileName);
 
       ElNotification.success({
         title: '成功',
-        message: `已生成 ${totalRows} 个Word文件，已打包下载`,
+        message: `已生成 ${totalRows} 个${
+          exportFormat.value === 'docx' ? 'Word' : 'PDF'
+        }文件，已打包下载`,
         duration: 3000,
       });
     } catch (error) {
