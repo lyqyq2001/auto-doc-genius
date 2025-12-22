@@ -1,6 +1,7 @@
 const { app, BrowserWindow, ipcMain } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const temp = require('temp');
 
 // 屏蔽安全警告
 process.env.ELECTRON_DISABLE_SECURITY_WARNINGS = 'true';
@@ -37,7 +38,7 @@ const createWindow = () => {
 // 导入Office转换器
 const { convertWordToPdfWithOffice, checkWordInstallation } = require('./officeConverter');
 const os = require('os');
-const temp = require('temp');
+
 
 // 1. 初始化/获取隐藏窗口
 async function getWorkerWindow() {

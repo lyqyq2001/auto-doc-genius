@@ -1,5 +1,5 @@
 {
-  "name": "AutoDocGenius",
+  "name": "auto-doc-genius",
   "private": true,
   "version": "0.0.0",
   "scripts": {
@@ -21,6 +21,7 @@
     "@vitejs/plugin-vue": "^6.0.1",
     "electron": "^39.2.7",
     "electron-builder": "^26.0.12",
+    "terser": "^5.44.1",
     "vite": "^7.2.4",
     "vite-plugin-electron": "^0.29.0"
   },
@@ -32,7 +33,42 @@
       "output": "release"
     },
     "win": {
-      "target": "nsis"
-    }
+      "target": "nsis",
+      "icon": "public/icon.ico"
+    },
+    "compression": "maximum",
+    "asar": true,
+    "asarUnpack": [
+      "node_modules/docxtemplater/**/*",
+      "node_modules/pizzip/**/*",
+      "node_modules/xlsx/**/*",
+      "node_modules/temp/**/*",
+      "node_modules/rimraf/**/*",
+      "electron/**/*"
+    ],
+    "files": [
+      "dist/**/*",
+      "dist-electron/**/*",
+      "electron/**/*",
+      "node_modules/temp/**/*",
+      "node_modules/rimraf/**/*",
+      "node_modules/glob/**/*",
+      "node_modules/minimatch/**/*",
+      "node_modules/docxtemplater/**/*",
+      "node_modules/pizzip/**/*",
+      "node_modules/xlsx/**/*",
+      "!src/**/*",
+      "!*.md",
+      "!.gitignore",
+      "!.vscode/**/*",
+      "!package-lock.json"
+    ],
+    "extraResources": [],
+    "publish": [
+      {
+        "provider": "generic",
+        "url": "http://localhost:3000/"
+      }
+    ]
   }
 }

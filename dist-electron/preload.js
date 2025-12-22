@@ -1,0 +1,1 @@
+"use strict";const{contextBridge:c,ipcRenderer:n}=require("electron");c.exposeInMainWorld("electronAPI",{convertBatchToPdf:(e,r)=>n.invoke("batch-convert-pdf",e,r),checkOfficeInstallation:()=>n.invoke("check-office-installation"),onRenderDocx:e=>n.on("render-docx",(r,o)=>e(o)),sendRenderDone:()=>n.send("render-done"),sendRenderError:e=>n.send("render-error",e)});
