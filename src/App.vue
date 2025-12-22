@@ -1,7 +1,7 @@
 
 <template>
   <div class="app-container">
-    <h1 class="title">Excel转Word批量生成器</h1>
+    <h1 class="title">Excel转报告批量生成器</h1>
 
     <div class="card-container">
       <!-- Excel上传区域 -->
