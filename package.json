@@ -52,6 +52,8 @@
       "dist/**/*",
       "dist-electron/**/*",
       "electron/**/*",
+      "Excel Template.xls",
+      "Word Template.docx",
       "node_modules/temp/**/*",
       "node_modules/rimraf/**/*",
       "node_modules/glob/**/*",
