@@ -36,17 +36,18 @@ const createWindow = () => {
 
 // Office转换PDF
 async function convertPdfByOffice(docxFiles) {
-  const pdfResults = [];
-
   try {
     // 检查Word是否安装
-    if (!checkWordInstallation()) {
+    if (!(await checkWordInstallation())) {
       return { success: false, error: '未检测到Microsoft Word安装' };
     }
 
-    // 串行处理循环
-    for (const [_index, file] of docxFiles.entries()) {
-      // 创建临时文件
+    // 并行处理文件转换，每次处理2个文件，避免Office应用资源占用过高
+    const batchSize = 2;
+    const pdfResults = [];
+
+    // 创建转换单个文件的函数
+    const convertSingleFile = async file => {
       const tempDir = temp.mkdirSync('autodocgenius');
       const docxPath = path.join(tempDir, file.name);
       const pdfPath = path.join(tempDir, file.name.replace('.docx', '.pdf'));
@@ -56,17 +57,17 @@ async function convertPdfByOffice(docxFiles) {
         fs.writeFileSync(docxPath, Buffer.from(file.buffer));
 
         // 使用Office转换
-        const success = convertWordToPdfWithOffice(docxPath, pdfPath);
+        const success = await convertWordToPdfWithOffice(docxPath, pdfPath);
 
         if (success && fs.existsSync(pdfPath)) {
           // 读取转换后的PDF
           const pdfBuffer = fs.readFileSync(pdfPath);
-          pdfResults.push({
+          return {
             name: file.name.replace('.docx', '.pdf'),
             data: pdfBuffer,
-          });
+          };
         } else {
-          return { success: false, error: `转换失败: ${file.name}` };
+          throw new Error(`转换失败: ${file.name}`);
         }
       } finally {
         // 清理临时文件
@@ -75,6 +76,13 @@ async function convertPdfByOffice(docxFiles) {
         if (fs.existsSync(tempDir))
           fs.rmSync(tempDir, { recursive: true, force: true });
       }
+    };
+
+    // 分批处理文件
+    for (let i = 0; i < docxFiles.length; i += batchSize) {
+      const batch = docxFiles.slice(i, i + batchSize);
+      const batchResults = await Promise.all(batch.map(convertSingleFile));
+      pdfResults.push(...batchResults);
     }
 
     return { success: true, results: pdfResults };

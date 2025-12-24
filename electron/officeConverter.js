@@ -1,4 +1,4 @@
-const { execSync } = require('child_process');
+const { exec } = require('child_process');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
@@ -7,28 +7,29 @@ const os = require('os');
  * 转换 Word 为 PDF (兼容 Microsoft Word 和 WPS)
  * 逻辑：优先尝试调用 MS Word，如果失败则尝试调用 WPS
  */
-function convertWordToPdfWithOffice(inputPath, outputPath) {
+async function convertWordToPdfWithOffice(inputPath, outputPath) {
   let tempScriptPath = null;
 
-  try {
-    //  路径标准化
-    const absInputPath = path.resolve(inputPath);
-    const absOutputPath = path.resolve(outputPath);
+  return new Promise((resolve, reject) => {
+    try {
+      //  路径标准化
+      const absInputPath = path.resolve(inputPath);
+      const absOutputPath = path.resolve(outputPath);
 
-    // 确保输出目录存在
-    const outputDir = path.dirname(absOutputPath);
-    if (!fs.existsSync(outputDir)) {
-      fs.mkdirSync(outputDir, { recursive: true });
-    }
+      // 确保输出目录存在
+      const outputDir = path.dirname(absOutputPath);
+      if (!fs.existsSync(outputDir)) {
+        fs.mkdirSync(outputDir, { recursive: true });
+      }
 
-    //  创建临时目录
-    const tempDir = path.join(os.tmpdir(), 'office_convert_' + Date.now());
-    if (!fs.existsSync(tempDir)) {
-      fs.mkdirSync(tempDir, { recursive: true });
-    }
+      //  创建临时目录
+      const tempDir = path.join(os.tmpdir(), 'office_convert_' + Date.now());
+      if (!fs.existsSync(tempDir)) {
+        fs.mkdirSync(tempDir, { recursive: true });
+      }
 
-    //  构建 PowerShell 脚本
-    const psContent = `
+      //  构建 PowerShell 脚本
+      const psContent = `
 $ErrorActionPreference = "Stop"
 $inputPath = "${absInputPath}"
 $outputPath = "${absOutputPath}"
@@ -104,52 +105,68 @@ try {
 }
 `;
 
-    //  写入脚本文件
-    tempScriptPath = path.join(tempDir, 'convert.ps1');
-    fs.writeFileSync(tempScriptPath, psContent, { encoding: 'utf8' });
+      //  写入脚本文件
+      tempScriptPath = path.join(tempDir, 'convert.ps1');
+      fs.writeFileSync(tempScriptPath, psContent, { encoding: 'utf8' });
 
-    // 执行脚本
-    const cmd = `powershell -NoProfile -ExecutionPolicy Bypass -File "${tempScriptPath}"`;
+      // 执行脚本
+      const cmd = `powershell -NoProfile -ExecutionPolicy Bypass -File "${tempScriptPath}"`;
 
-    const result = execSync(cmd, {
-      encoding: 'utf8',
-      timeout: 120000,
-      windowsHide: true,
-    });
+      exec(
+        cmd,
+        {
+          encoding: 'utf8',
+          timeout: 120000,
+          windowsHide: true,
+        },
+        (error, stdout, stderr) => {
+          //  清理临时目录
+          try {
+            if (fs.existsSync(tempDir)) {
+              fs.rmSync(tempDir, { recursive: true, force: true });
+            }
+          } catch (e) {}
 
-    //  清理临时目录
-    try {
-      if (fs.existsSync(tempDir)) {
-        fs.rmSync(tempDir, { recursive: true, force: true });
+          if (error) {
+            console.error(`[Office] Failed: ${error.message}`);
+            if (stdout) console.error(stdout);
+            if (stderr) console.error(stderr);
+            resolve(false);
+            return;
+          }
+
+          //  验证结果
+          if (
+            stdout.includes('CONVERSION_SUCCESS') &&
+            fs.existsSync(absOutputPath)
+          ) {
+            resolve(true);
+          } else {
+            console.error(`[Office] Output:\n${stdout}`);
+            if (stderr) console.error(stderr);
+            resolve(false);
+          }
+        }
+      );
+    } catch (error) {
+      console.error(`[Office] Failed: ${error.message}`);
+      // 清理残留
+      if (tempScriptPath && fs.existsSync(path.dirname(tempScriptPath))) {
+        try {
+          fs.rmSync(path.dirname(tempScriptPath), {
+            recursive: true,
+            force: true,
+          });
+        } catch (e) {}
       }
-    } catch (e) {}
-
-    //  验证结果
-    if (result.includes('CONVERSION_SUCCESS') && fs.existsSync(absOutputPath)) {
-      return true;
-    } else {
-      console.error(`[Office] Output:\n${result}`);
-      return false;
+      resolve(false);
     }
-  } catch (error) {
-    console.error(`[Office] Failed: ${error.message}`);
-    if (error.stdout) console.error(error.stdout.toString());
-    // 清理残留
-    if (tempScriptPath && fs.existsSync(path.dirname(tempScriptPath))) {
-      try {
-        fs.rmSync(path.dirname(tempScriptPath), {
-          recursive: true,
-          force: true,
-        });
-      } catch (e) {}
-    }
-    return false;
-  }
+  });
 }
 
-function checkWordInstallation() {
+async function checkWordInstallation() {
   // 简单检查：只要能调起 Word 或 WPS 就算已安装
-  try {
+  return new Promise((resolve) => {
     const checkCmd = `
         try { 
             $a = New-Object -ComObject Word.Application; $a.Quit() 
@@ -157,14 +174,17 @@ function checkWordInstallation() {
             $b = New-Object -ComObject Kwps.Application; $b.Quit() 
         }
         `;
-    execSync(`powershell -Command "${checkCmd}"`, {
+    exec(`powershell -Command "${checkCmd}"`, {
       stdio: 'ignore',
       timeout: 10000,
+    }, (error) => {
+      if (error) {
+        resolve(false);
+      } else {
+        resolve(true);
+      }
     });
-    return true;
-  } catch (e) {
-    return false;
-  }
+  });
 }
 
 module.exports = {

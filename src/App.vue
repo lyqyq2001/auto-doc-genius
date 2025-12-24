@@ -465,7 +465,7 @@
       // 如果是 PDF 模式，开始调用主进程转换
       if (exportFormat.value === 'pdf' && tempDocxList.length > 0) {
         progress.value = 100;
-        progressText.value = '正在使用微软Office进行 Word 转 PDF，请稍候...';
+        progressText.value = '正在使用微软Office进行 Word 转 PDF，该过程较慢 请稍候...';
 
         try {
           // 调用主进程 API
