@@ -119,7 +119,7 @@
 </template>
 
 <script setup>
-  import { ref, } from 'vue';
+  import { ref } from 'vue';
   import { ElMessage, ElNotification } from 'element-plus';
   import * as XLSX from 'xlsx';
   import { saveAs } from 'file-saver';
@@ -352,18 +352,15 @@
     progress.value = 0;
     progressText.value = '准备中...';
 
+    const startTime = Date.now();
+
     try {
-      // 解析Excel数据
       const excelData = await parseExcel(excelFile.value);
       const totalRows = excelData.length;
 
-      // 读取Word模板
       const wordTemplate = await readWordTemplate(wordFile.value);
 
-      // 创建JSZip实例
       const zip = new JSZip();
-
-      // 定义一个临时数组存放生成的 docx buffer
       const tempDocxList = [];
 
       // 遍历Excel数据行
@@ -465,7 +462,8 @@
       // 如果是 PDF 模式，开始调用主进程转换
       if (exportFormat.value === 'pdf' && tempDocxList.length > 0) {
         progress.value = 100;
-        progressText.value = '正在使用微软Office进行 Word 转 PDF，该过程较慢 请稍候...';
+        progressText.value =
+          '正在使用微软Office进行 Word 转 PDF，该过程较慢 请稍候...';
 
         try {
           // 调用主进程 API
@@ -508,11 +506,14 @@
       // 下载ZIP文件
       saveAs(zipBlob, zipFileName);
 
+      const endTime = Date.now();
+      const elapsedSeconds = Math.round((endTime - startTime) / 1000);
+
       ElNotification.success({
         title: '成功',
         message: `已生成 ${totalRows} 个${
           exportFormat.value === 'docx' ? 'Word' : 'PDF'
-        }文件，已打包下载`,
+        }文件，已打包下载。耗时: ${elapsedSeconds}秒`,
         duration: 3000,
       });
     } catch (error) {
