@@ -119,7 +119,7 @@
 </template>
 
 <script setup>
-  import { ref, onMounted } from 'vue';
+  import { ref, } from 'vue';
   import { ElMessage, ElNotification } from 'element-plus';
   import * as XLSX from 'xlsx';
   import { saveAs } from 'file-saver';
@@ -526,7 +526,7 @@
   };
 </script>
 
-<style scoped>
+<style>
   .app-container {
     max-width: 1000px;
     margin: 0 auto;

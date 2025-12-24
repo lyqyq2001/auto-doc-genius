@@ -5,6 +5,7 @@ const temp = require('temp');
 const {
   convertWordToPdfWithOffice,
   checkWordInstallation,
+  convertBatchWordToPdf,
 } = require('./officeConverter');
 
 // 屏蔽安全警告
@@ -34,7 +35,7 @@ const createWindow = () => {
   }
 };
 
-// Office转换PDF
+// Office转换PDF - 优化版本（多实例并行）
 async function convertPdfByOffice(docxFiles) {
   try {
     // 检查Word是否安装
@@ -42,47 +43,79 @@ async function convertPdfByOffice(docxFiles) {
       return { success: false, error: '未检测到Microsoft Word安装' };
     }
 
-    // 并行处理文件转换，每次处理2个文件，避免Office应用资源占用过高
-    const batchSize = 2;
-    const pdfResults = [];
+    // 根据文件数量确定并行度
+    const fileCount = docxFiles.length;
+    const parallelCount = Math.min(Math.max(2, Math.ceil(fileCount / 3)), 4);
 
-    // 创建转换单个文件的函数
-    const convertSingleFile = async file => {
-      const tempDir = temp.mkdirSync('autodocgenius');
-      const docxPath = path.join(tempDir, file.name);
-      const pdfPath = path.join(tempDir, file.name.replace('.docx', '.pdf'));
+    console.log(`[PDF] 开始转换 ${fileCount} 个文件，使用 ${parallelCount} 个并行实例`);
 
-      try {
-        // 写入临时Word文件
+    // 将文件分成多个批次
+    const batches = [];
+    const batchSize = Math.ceil(fileCount / parallelCount);
+    for (let i = 0; i < fileCount; i += batchSize) {
+      batches.push(docxFiles.slice(i, i + batchSize));
+    }
+
+    // 并行处理每个批次
+    const batchPromises = batches.map(async (batch, batchIndex) => {
+      const tempDir = temp.mkdirSync(`autodocgenius_batch_${batchIndex}`);
+      const inputOutputPairs = [];
+
+      // 准备批次的文件
+      for (const file of batch) {
+        const docxPath = path.join(tempDir, file.name);
+        const pdfPath = path.join(tempDir, file.name.replace('.docx', '.pdf'));
         fs.writeFileSync(docxPath, Buffer.from(file.buffer));
-
-        // 使用Office转换
-        const success = await convertWordToPdfWithOffice(docxPath, pdfPath);
-
-        if (success && fs.existsSync(pdfPath)) {
-          // 读取转换后的PDF
-          const pdfBuffer = fs.readFileSync(pdfPath);
-          return {
-            name: file.name.replace('.docx', '.pdf'),
-            data: pdfBuffer,
-          };
-        } else {
-          throw new Error(`转换失败: ${file.name}`);
-        }
-      } finally {
-        // 清理临时文件
-        if (fs.existsSync(docxPath)) fs.unlinkSync(docxPath);
-        if (fs.existsSync(pdfPath)) fs.unlinkSync(pdfPath);
-        if (fs.existsSync(tempDir))
-          fs.rmSync(tempDir, { recursive: true, force: true });
+        inputOutputPairs.push({ input: docxPath, output: pdfPath });
       }
-    };
 
-    // 分批处理文件
-    for (let i = 0; i < docxFiles.length; i += batchSize) {
-      const batch = docxFiles.slice(i, i + batchSize);
-      const batchResults = await Promise.all(batch.map(convertSingleFile));
-      pdfResults.push(...batchResults);
+      // 使用批量转换函数
+      const batchResult = await convertBatchWordToPdf(inputOutputPairs);
+
+      // 读取转换后的PDF文件
+      const pdfResults = [];
+      if (batchResult.success) {
+        for (const pair of inputOutputPairs) {
+          const pdfPath = pair.output;
+          if (fs.existsSync(pdfPath)) {
+            const pdfBuffer = fs.readFileSync(pdfPath);
+            pdfResults.push({
+              name: path.basename(pdfPath),
+              data: pdfBuffer,
+            });
+          }
+        }
+      }
+
+      // 清理临时文件
+      try {
+        if (fs.existsSync(tempDir)) {
+          fs.rmSync(tempDir, { recursive: true, force: true });
+        }
+      } catch (e) {
+        console.warn(`清理临时目录失败 [批次${batchIndex}]:`, e);
+      }
+
+      return { results: pdfResults, error: batchResult.error };
+    });
+
+    // 等待所有批次完成
+    const batchResults = await Promise.all(batchPromises);
+
+    // 合并结果
+    const pdfResults = [];
+    const errors = [];
+
+    batchResults.forEach((result, index) => {
+      if (result.results && result.results.length > 0) {
+        pdfResults.push(...result.results);
+      } else if (result.error) {
+        errors.push(`批次${index + 1}: ${result.error}`);
+      }
+    });
+
+    if (errors.length > 0) {
+      console.warn('[PDF] 部分批次转换失败:', errors.join('; '));
     }
 
     return { success: true, results: pdfResults };
