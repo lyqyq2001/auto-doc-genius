@@ -1,9 +1,9 @@
 import { defineConfig } from 'vite';
 import vue from '@vitejs/plugin-vue';
 import electron from 'vite-plugin-electron';
-import AutoImport from 'unplugin-auto-import/vite'
-import Components from 'unplugin-vue-components/vite'
-import { ElementPlusResolver } from 'unplugin-vue-components/resolvers'
+import AutoImport from 'unplugin-auto-import/vite';
+import Components from 'unplugin-vue-components/vite';
+import { ElementPlusResolver } from 'unplugin-vue-components/resolvers';
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [
@@ -21,21 +21,18 @@ export default defineConfig({
       },
     }),
   ],
-  // 性能优化配置
   build: {
-    // 代码分割
+    target: 'esnext',
     rollupOptions: {
       output: {
         manualChunks: {
-          // 将大型依赖单独打包
           'element-plus': ['element-plus'],
-          'xlsx': ['xlsx'],
-          'docxtemplater': ['docxtemplater', 'pizzip'],
-          'jszip': ['jszip', 'file-saver'],
+          xlsx: ['xlsx'],
+          docxtemplater: ['docxtemplater', 'pizzip'],
+          jszip: ['jszip', 'file-saver'],
         },
       },
     },
-    // 减小打包体积
     minify: 'terser',
     terserOptions: {
       compress: {
@@ -44,12 +41,9 @@ export default defineConfig({
         pure_funcs: ['console.log'],
       },
     },
-    // 生成 sourcemap，便于调试
-    sourcemap: false,
-    // 启用 CSS 代码分割
     cssCodeSplit: true,
+    chunkSizeWarningLimit: 1000,
   },
-  // 优化依赖预构建
   optimizeDeps: {
     include: [
       'vue',
@@ -62,18 +56,10 @@ export default defineConfig({
     ],
     exclude: ['electron'],
   },
-  // 开发服务器优化
   server: {
     port: 5173,
     host: '0.0.0.0',
     open: false,
-    // 增加服务器响应超时
     timeout: 60000,
-  },
-  // 预览服务器优化
-  preview: {
-    port: 5174,
-    host: '0.0.0.0',
-    open: false,
   },
 });
