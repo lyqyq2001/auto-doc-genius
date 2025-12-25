@@ -3,7 +3,6 @@ const path = require('path');
 const fs = require('fs');
 const temp = require('temp');
 const {
-  convertWordToPdfWithOffice,
   checkWordInstallation,
   convertBatchWordToPdf,
 } = require('./officeConverter');
@@ -38,16 +37,9 @@ const createWindow = () => {
 // Office转换PDF - 优化版本（多实例并行）
 async function convertPdfByOffice(docxFiles) {
   try {
-    // 检查Word是否安装
-    if (!(await checkWordInstallation())) {
-      return { success: false, error: '未检测到Microsoft Word安装' };
-    }
-
     // 根据文件数量确定并行度
     const fileCount = docxFiles.length;
     const parallelCount = Math.min(Math.max(2, Math.ceil(fileCount / 3)), 4);
-
-    console.log(`[PDF] 开始转换 ${fileCount} 个文件，使用 ${parallelCount} 个并行实例`);
 
     // 将文件分成多个批次
     const batches = [];
@@ -58,14 +50,18 @@ async function convertPdfByOffice(docxFiles) {
 
     // 并行处理每个批次
     const batchPromises = batches.map(async (batch, batchIndex) => {
+      // 创建一个临时目录用于存储批次文件 例如 C：\Users\12268\AppData\Local\Temp\autodocgenius_batch_0
       const tempDir = temp.mkdirSync(`autodocgenius_batch_${batchIndex}`);
       const inputOutputPairs = [];
-
       // 准备批次的文件
       for (const file of batch) {
+        //例如 C：\Users\12268\AppData\Local\Temp\autodocgenius_batch_0\test.docx
         const docxPath = path.join(tempDir, file.name);
+        //例如 C：\Users\12268\AppData\Local\Temp\autodocgenius_batch_0\test.pdf
         const pdfPath = path.join(tempDir, file.name.replace('.docx', '.pdf'));
+        // 将buffer写入docx文件
         fs.writeFileSync(docxPath, Buffer.from(file.buffer));
+
         inputOutputPairs.push({ input: docxPath, output: pdfPath });
       }
 
@@ -125,7 +121,7 @@ async function convertPdfByOffice(docxFiles) {
 }
 
 //  注册 IPC 处理函数
-ipcMain.handle('batch-convert-pdf', async (event, docxFiles, options = {}) => {
+ipcMain.handle('batch-convert-pdf', async (_event, docxFiles) => {
   return convertPdfByOffice(docxFiles);
 });
 

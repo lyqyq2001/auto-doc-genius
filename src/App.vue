@@ -86,12 +86,7 @@
           type="primary"
           style="width: 100%"
           :loading="generating"
-          :disabled="
-            !excelFile ||
-            !wordFile ||
-            generating ||
-            (exportFormat === 'pdf' && !officeInstalled)
-          "
+          :disabled="disabled"
           @click="startGenerate"
           size="large"
         >
@@ -119,7 +114,7 @@
 </template>
 
 <script setup>
-  import { ref } from 'vue';
+  import { ref, computed } from 'vue';
   import { ElMessage, ElNotification } from 'element-plus';
   import * as XLSX from 'xlsx';
   import { saveAs } from 'file-saver';
@@ -140,7 +135,14 @@
   const exportFormat = ref('docx');
   // Office是否安装
   const officeInstalled = ref(false);
-
+  const disabled = computed(() => {
+    return (
+      !excelFile.value ||
+      !wordFile.value ||
+      generating.value ||
+      (exportFormat.value === 'pdf' && !officeInstalled.value)
+    );
+  });
   // 下载Excel模板
   const downloadExcelTemplate = () => {
     try {
@@ -181,10 +183,8 @@
       if (window.electronAPI && window.electronAPI.checkOfficeInstallation) {
         officeInstalled.value =
           await window.electronAPI.checkOfficeInstallation();
-        console.log('Office安装状态:', officeInstalled.value);
       }
     } catch (error) {
-      console.error('检查Office安装状态失败:', error);
       officeInstalled.value = false;
     }
   };
@@ -242,11 +242,10 @@
           const workbook = XLSX.read(data, { type: 'array' });
           const firstSheetName = workbook.SheetNames[0];
           const worksheet = workbook.Sheets[firstSheetName];
-
-          // 解析为JSON格式，header: 1 表示使用数组索引作为默认表头
+          // 转换为JSON数据，header:1表示返回一个二维数组，jsonData中每个元素都是一个数组，数组中的每个元素都是单元格的值
+          // 默认情况下，即无header参数时，返回的是一个对象数组，每个对象中的属性名是第一行单元格的内容，属性值是其余行单元格的值
           const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
 
-          // 第一行是描述，第二行是表头，所以至少需要3行数据
           if (jsonData.length < 3) {
             reject(
               new Error(
@@ -256,12 +255,7 @@
             return;
           }
 
-          // 获取表头（第二行）和数据行（第三行及以后）
           const headers = jsonData[1];
-          // 打印提取的表头，用于调试
-          console.log('提取的Excel表头:', headers);
-
-          // 跳过第一行（描述）和第二行（表头），从第三行开始处理数据
           const rows = jsonData
             .slice(2)
             .filter(row =>
@@ -275,33 +269,23 @@
             return;
           }
 
-          // 将每行数据转换为对象，键为表头
           const formattedRows = rows.map(row => {
             const obj = {};
             headers.forEach((header, index) => {
               let value = row[index] || '';
 
-              // 修复Excel日期和时间格式问题
               if (typeof value === 'number') {
-                // 检查是否为日期数字（大于25569表示1970年以后的日期）
                 if (value > 25569) {
-                  // 转换为JavaScript日期
                   const date = new Date((value - 25569) * 86400000);
-                  // 格式化日期为YYYY-MM-DD或YYYY年MM月DD日
                   value = `${date.getFullYear()}年${(date.getMonth() + 1)
                     .toString()
                     .padStart(2, '0')}月${date
                     .getDate()
                     .toString()
                     .padStart(2, '0')}日`;
-                }
-                // 检查是否为时间数字（小于1表示时间）
-                else if (value > 0 && value < 1) {
-                  // 转换为小时数（1天=24小时）
+                } else if (value > 0 && value < 1) {
                   const hours = Math.floor(value * 24);
-                  // 转换为分钟数
                   const minutes = Math.floor((value * 24 * 60) % 60);
-                  // 格式化时间为HH:MM
                   value = `${hours.toString().padStart(2, '0')}:${minutes
                     .toString()
                     .padStart(2, '0')}`;
@@ -355,65 +339,39 @@
     const startTime = Date.now();
 
     try {
+      // [{XXX01:'xxx',XXX02:'xxx',......} , ....]
       const excelData = await parseExcel(excelFile.value);
-      const totalRows = excelData.length;
-
+      // arraybuffer
       const wordTemplate = await readWordTemplate(wordFile.value);
-
       const zip = new JSZip();
       const tempDocxList = [];
 
       // 遍历Excel数据行
-      for (let i = 0; i < totalRows; i++) {
-        progress.value = Math.round((i / totalRows) * 100);
-        progressText.value = `正在处理第 ${i + 1} 行，共 ${totalRows} 行`;
+      for (let i = 0; i < excelData.length; i++) {
+        progress.value = Math.round((i / excelData.length) * 100); // 进度百分比
+        progressText.value = `正在处理第 ${i + 1} 行，共 ${
+          excelData.length
+        } 行`;
 
         const rowData = excelData[i];
-        console.log(`第${i + 1}行数据:`, rowData);
 
         // 使用pizzip加载Word模板
         const templateZip = new PizZip(wordTemplate);
-
-        // 遍历所有XML文件，将XXX01格式替换为{XXX01}格式
+        // 遍历所有XML文件
         Object.keys(templateZip.files).forEach(filename => {
           if (filename.endsWith('.xml')) {
+            // 先去拿到所有以xml结尾的文件，templateZip.file(filename)拿到zipObject对象 再转成文本
             const fileContent = templateZip.file(filename).asText();
+
             let updatedContent = fileContent;
-
-            // 检查文件内容中是否包含任何XXX字段
-            const hasXXX = fileContent.includes('XXX');
-            console.log(`文件 ${filename} 中包含XXX: ${hasXXX}`);
-
-            if (hasXXX) {
-              // 打印所有包含XXX的行，用于调试
-              const lines = fileContent.split('\n');
-              lines.forEach((line, index) => {
-                if (line.includes('XXX')) {
-                  console.log(
-                    `文件 ${filename} 第${index + 1}行: ${line.trim()}`
-                  );
-                }
-              });
-            }
 
             // 遍历所有数据键，替换模板中的占位符
             Object.keys(rowData).forEach(key => {
-              // 直接替换所有出现的key，使用全局替换
               const regex = new RegExp(key, 'g');
-              const updated = updatedContent.replace(regex, `{${key}}`);
-
-              // 计算替换数量
-              const originalMatches = updatedContent.match(regex) || [];
-              const newMatches =
-                updated.match(new RegExp(`\{${key}\}`, 'g')) || [];
-
-              if (originalMatches.length > 0) {
-                console.log(
-                  `文件 ${filename} 中: ${originalMatches.length}个${key} → ${newMatches.length}个{${key}}`
-                );
+              // 只替换没有花括号的，避免重复
+              if (!updatedContent.includes(`{${key}}`)) {
+                updatedContent = updatedContent.replace(regex, `{${key}}`);
               }
-
-              updatedContent = updated;
             });
 
             // 更新文件内容
@@ -421,7 +379,7 @@
           }
         });
 
-        // 创建docxtemplater实例，配置支持{字段名}格式的占位符
+        // 创建docxtemplater实例，模板中可以写XXX01或者{XXX01}, {}的形式是为了让用户更灵活的配置占位符的名称
         const doc = new Docxtemplater(templateZip, {
           paragraphLoop: true,
           linebreaks: true,
@@ -431,7 +389,7 @@
             end: '}',
           },
         });
-
+        // 将数据渲染到模板中 开始替换
         doc.render(rowData);
 
         // 生成Word文件，使用arraybuffer格式，方便后续转换
@@ -457,8 +415,6 @@
         }
       }
 
-      // === 循环结束后的逻辑 ===
-
       // 如果是 PDF 模式，开始调用主进程转换
       if (exportFormat.value === 'pdf' && tempDocxList.length > 0) {
         progress.value = 100;
@@ -467,12 +423,8 @@
 
         try {
           // 调用主进程 API
-          // 注意：如果文件特别多（几百个），建议分批次发送，避免 IPC 通道阻塞
           const result = await window.electronAPI.convertBatchToPdf(
             tempDocxList,
-            {
-              method: 'office',
-            }
           );
 
           if (result.success) {
@@ -490,8 +442,6 @@
         }
       }
 
-      // 完成进度
-      progress.value = 100;
       progressText.value = '正在打包文件...';
 
       // 生成ZIP文件
@@ -511,7 +461,7 @@
 
       ElNotification.success({
         title: '成功',
-        message: `已生成 ${totalRows} 个${
+        message: `已生成 ${excelData.length} 个${
           exportFormat.value === 'docx' ? 'Word' : 'PDF'
         }文件，已打包下载。耗时: ${elapsedSeconds}秒`,
         duration: 3000,
