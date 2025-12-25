@@ -184,30 +184,7 @@ try {
 
           // 解析成功的结果 stdout是命令执行后输出的内容 BATCH_CONVERSION_SUCCESS是我们自定义的成功标记
           if (stdout.includes('BATCH_CONVERSION_SUCCESS')) {
-            try {
-
-              // 1. 找到成功标记的位置
-              const successIndex = stdout.indexOf('BATCH_CONVERSION_SUCCESS');
-              // 2. 从成功标记之后，查找第一个 '['（JSON数组开始）
-              const jsonStart = stdout.indexOf('[', successIndex);
-              // 3. 查找最后一个 ']'（JSON数组结束）
-              const jsonEnd = stdout.lastIndexOf(']');
-
-              if (jsonStart >= 0 && jsonEnd > jsonStart) {
-                const jsonStr = stdout.substring(jsonStart, jsonEnd + 1);
-                const results = JSON.parse(jsonStr).filter(r => !r.Success);
-                resolve({ success: true, results });
-              } else {
-                console.warn('[Office 批量转换] 输出中未找到JSON数组');
-                resolve({ success: true, results: [] });
-              }
-            } catch (e) {
-              console.error(
-                `[Office 批量转换] 解析结果失败: ${e.message}`
-              );
-              console.error(`[Office 批量转换] 输出:\n${stdout}`);
-              resolve({ success: false, error: '解析结果失败' });
-            }
+            resolve({ success: true });
           } else {
             console.error(`[Office 批量转换] 输出:\n${stdout}`);
             if (stderr) console.error(stderr);

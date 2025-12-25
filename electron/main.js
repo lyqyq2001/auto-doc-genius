@@ -66,11 +66,11 @@ async function convertPdfByOffice(docxFiles) {
       }
 
       // 使用批量转换函数
-      const batchResult = await convertBatchWordToPdf(inputOutputPairs);
+      const r = await convertBatchWordToPdf(inputOutputPairs);
 
       // 读取转换后的PDF文件
       const pdfResults = [];
-      if (batchResult.success) {
+      if (r.success) {
         for (const pair of inputOutputPairs) {
           const pdfPath = pair.output;
           if (fs.existsSync(pdfPath)) {
@@ -92,7 +92,7 @@ async function convertPdfByOffice(docxFiles) {
         console.warn(`清理临时目录失败 [批次${batchIndex}]:`, e);
       }
 
-      return { results: pdfResults, error: batchResult.error };
+      return { results: pdfResults, error: r.error };
     });
 
     // 等待所有批次完成
