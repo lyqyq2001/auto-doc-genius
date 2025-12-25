@@ -48,18 +48,14 @@ async function convertPdfByOffice(docxFiles) {
       batches.push(docxFiles.slice(i, i + batchSize));
     }
 
+    const pdfResults = [];
     // 并行处理每个批次
     const batchPromises = batches.map(async (batch, batchIndex) => {
-      // 创建一个临时目录用于存储批次文件 例如 C：\Users\12268\AppData\Local\Temp\autodocgenius_batch_0
       const tempDir = temp.mkdirSync(`autodocgenius_batch_${batchIndex}`);
       const inputOutputPairs = [];
-      // 准备批次的文件
       for (const file of batch) {
-        //例如 C：\Users\12268\AppData\Local\Temp\autodocgenius_batch_0\test.docx
         const docxPath = path.join(tempDir, file.name);
-        //例如 C：\Users\12268\AppData\Local\Temp\autodocgenius_batch_0\test.pdf
         const pdfPath = path.join(tempDir, file.name.replace('.docx', '.pdf'));
-        // 将buffer写入docx文件
         fs.writeFileSync(docxPath, Buffer.from(file.buffer));
 
         inputOutputPairs.push({ input: docxPath, output: pdfPath });
@@ -68,18 +64,15 @@ async function convertPdfByOffice(docxFiles) {
       // 使用批量转换函数
       const r = await convertBatchWordToPdf(inputOutputPairs);
 
-      // 读取转换后的PDF文件
-      const pdfResults = [];
       if (r.success) {
         for (const pair of inputOutputPairs) {
           const pdfPath = pair.output;
-          if (fs.existsSync(pdfPath)) {
-            const pdfBuffer = fs.readFileSync(pdfPath);
-            pdfResults.push({
-              name: path.basename(pdfPath),
-              data: pdfBuffer,
-            });
-          }
+
+          const pdfBuffer = fs.readFileSync(pdfPath);
+          pdfResults.push({
+            name: path.basename(pdfPath),
+            data: pdfBuffer,
+          });
         }
       }
 
@@ -91,28 +84,9 @@ async function convertPdfByOffice(docxFiles) {
       } catch (e) {
         console.warn(`清理临时目录失败 [批次${batchIndex}]:`, e);
       }
-
-      return { results: pdfResults, error: r.error };
     });
 
-    // 等待所有批次完成
-    const batchResults = await Promise.all(batchPromises);
-
-    // 合并结果
-    const pdfResults = [];
-    const errors = [];
-
-    batchResults.forEach((result, index) => {
-      if (result.results && result.results.length > 0) {
-        pdfResults.push(...result.results);
-      } else if (result.error) {
-        errors.push(`批次${index + 1}: ${result.error}`);
-      }
-    });
-
-    if (errors.length > 0) {
-      console.warn('[PDF] 部分批次转换失败:', errors.join('; '));
-    }
+    await Promise.all(batchPromises);
 
     return { success: true, results: pdfResults };
   } catch (error) {
