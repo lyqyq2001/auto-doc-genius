@@ -34,7 +34,7 @@ const createWindow = () => {
   }
 };
 
-// Office转换PDF - 优化版本（多实例并行）
+// Office转换PDF
 async function convertPdfByOffice(docxFiles) {
   try {
     // 根据文件数量确定并行度
@@ -58,13 +58,21 @@ async function convertPdfByOffice(docxFiles) {
         const pdfPath = path.join(tempDir, file.name.replace('.docx', '.pdf'));
         fs.writeFileSync(docxPath, Buffer.from(file.buffer));
 
-        inputOutputPairs.push({ input: docxPath, output: pdfPath });
-      }
+      const file = batch[0];
+      //例如 C：\Users\12268\AppData\Local\Temp\autodocgenius_batch_0\test.docx
+      const docxPath = path.join(tempDir, file.name);
+      //例如 C：\Users\12268\AppData\Local\Temp\autodocgenius_batch_0\test.pdf
+      const pdfPath = path.join(tempDir, file.name.replace('.docx', '.pdf'));
+      // 将buffer写入docx文件
+      fs.writeFileSync(docxPath, Buffer.from(file.buffer));
+
+      inputOutputPairs.push({ input: docxPath, output: pdfPath });
 
       // 使用批量转换函数
       const r = await convertBatchWordToPdf(inputOutputPairs);
 
       if (r.success) {
+<<<<<<< HEAD
         for (const pair of inputOutputPairs) {
           const pdfPath = pair.output;
 
@@ -84,6 +92,18 @@ async function convertPdfByOffice(docxFiles) {
       } catch (e) {
         console.warn(`清理临时目录失败 [批次${batchIndex}]:`, e);
       }
+=======
+        const pdfPath = inputOutputPairs[0].output;
+
+        const pdfBuffer = fs.readFileSync(pdfPath);
+        pdfResults.push({
+          name: path.basename(pdfPath),
+          data: pdfBuffer,
+        });
+      }
+
+      fs.rmSync(tempDir, { recursive: true, force: true });
+>>>>>>> dbb2dac83c2c4a3d7fa0982bdab71328ca9af5d7
     });
 
     await Promise.all(batchPromises);
