@@ -52,7 +52,6 @@ async function convertBatchWordToPdf(inputOutputPairs) {
       if (!fs.existsSync(tempDir)) {
         fs.mkdirSync(tempDir, { recursive: true });
       }
-
       // 确保所有输出目录存在
       inputOutputPairs.forEach(pair => {
         const outputDir = path.dirname(pair.output);
@@ -60,7 +59,6 @@ async function convertBatchWordToPdf(inputOutputPairs) {
           fs.mkdirSync(outputDir, { recursive: true });
         }
       });
-
       // 构建 PowerShell 脚本 - 使用单个 Word 实例批量处理
       const psContent = `
 $ErrorActionPreference = "Stop"
@@ -168,7 +166,7 @@ try {
           timeout: 300000,
           windowsHide: true,
         },
-        (error, stdout, stderr) => {
+        (error, stdout) => {
           // 清理临时目录
           if (fs.existsSync(tempDir)) {
             fs.rmSync(tempDir, { recursive: true, force: true });
@@ -176,8 +174,6 @@ try {
 
           if (error) {
             console.error(`[Office 批量转换] 失败: ${error.message}`);
-            if (stdout) console.error(stdout);
-            if (stderr) console.error(stderr);
             resolve({ success: false, error: error.message });
             return;
           }
@@ -187,7 +183,7 @@ try {
             resolve({ success: true });
           } else {
             console.error(`[Office 批量转换] 输出:\n${stdout}`);
-            if (stderr) console.error(stderr);
+
             resolve({ success: false, error: '转换失败' });
           }
         }
@@ -195,14 +191,12 @@ try {
     } catch (error) {
       console.error(`[Office 批量转换] 失败: ${error.message}`);
       // 清理残留
-      if (tempScriptPath && fs.existsSync(path.dirname(tempScriptPath))) {
-        try {
-          fs.rmSync(path.dirname(tempScriptPath), {
-            recursive: true,
-            force: true,
-          });
-        } catch (e) {}
-      }
+
+      fs.rmSync(path.dirname(tempScriptPath), {
+        recursive: true,
+        force: true,
+      });
+
       resolve({ success: false, error: error.message });
     }
   });
