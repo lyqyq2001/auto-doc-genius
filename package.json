@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.0.0",
   "scripts": {
-    "dev": "vite",
+    "dev": "chcp 65001 && vite",
     "build": "vite build && electron-builder",
     "preview": "vite preview"
   },
