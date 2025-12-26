@@ -30,30 +30,37 @@ async function checkWordInstallation() {
   });
 }
 
-async function convertBatchWordToPdf(inputOutputPairs, progressCallback) {
-  return new Promise((resolve, reject) => {
-    let tempScriptPath = null;
-    let tempDir = null;
+async function convertBatchWordToPdf(inputOutputPairs) {
+  return new Promise(resolve => {
+    // 重试配置
+    const MAX_RETRIES = 3;
+    const RETRY_INTERVAL = 2000; // 2秒
+    let retryCount = 0;
 
-    try {
-      if (!inputOutputPairs || inputOutputPairs.length === 0) {
-        resolve({ success: true, results: [] });
-        return;
-      }
+    // 执行转换的函数
+    const executeConversion = () => {
+      let tempScriptPath = null;
+      let tempDir = null;
 
-      tempDir = path.join(os.tmpdir(), 'office_batch_convert_' + Date.now());
-      if (!fs.existsSync(tempDir)) {
-        fs.mkdirSync(tempDir, { recursive: true });
-      }
-
-      inputOutputPairs.forEach(pair => {
-        const outputDir = path.dirname(pair.output);
-        if (!fs.existsSync(outputDir)) {
-          fs.mkdirSync(outputDir, { recursive: true });
+      try {
+        if (!inputOutputPairs || inputOutputPairs.length === 0) {
+          resolve({ success: true, results: [] });
+          return;
         }
-      });
 
-      const psContent = `
+        tempDir = path.join(os.tmpdir(), 'office_batch_convert_' + Date.now());
+        if (!fs.existsSync(tempDir)) {
+          fs.mkdirSync(tempDir, { recursive: true });
+        }
+
+        inputOutputPairs.forEach(pair => {
+          const outputDir = path.dirname(pair.output);
+          if (!fs.existsSync(outputDir)) {
+            fs.mkdirSync(outputDir, { recursive: true });
+          }
+        });
+
+        const psContent = `
 $ErrorActionPreference = "Stop"
 $inputOutputPairs = @(
 ${inputOutputPairs
@@ -179,86 +186,109 @@ try {
 }
 `;
 
-      tempScriptPath = path.join(tempDir, 'batch_convert.ps1');
-      fs.writeFileSync(tempScriptPath, psContent, { encoding: 'utf8' });
+        tempScriptPath = path.join(tempDir, 'batch_convert.ps1');
+        fs.writeFileSync(tempScriptPath, psContent, { encoding: 'utf8' });
 
-      const cmd = `powershell -NoProfile -ExecutionPolicy Bypass -File "${tempScriptPath}"`;
+        const cmd = `powershell -NoProfile -ExecutionPolicy Bypass -File "${tempScriptPath}"`;
 
-      exec(
-        cmd,
-        {
-          encoding: 'utf8',
-          timeout: 300000,
-          windowsHide: true,
-        },
-        (error, stdout, stderr) => {
-          console.log(`[Office 批量转换] PowerShell输出:\n${stdout}`);
-          if (stderr) {
-            console.log(`[Office 批量转换] PowerShell错误:\n${stderr}`);
-          }
-
-          if (error) {
-            console.error(`[Office 批量转换] 失败: ${error.message}`);
+        exec(
+          cmd,
+          {
+            encoding: 'utf8',
+            timeout: 300000,
+            windowsHide: true,
+          },
+          (error, stdout) => {
+            // 清理临时文件
             if (fs.existsSync(tempDir)) {
               fs.rmSync(tempDir, { recursive: true, force: true });
             }
-            resolve({ success: false, error: error.message });
-            return;
-          }
 
-          if (stdout.includes('BATCH_CONVERSION_SUCCESS')) {
-            console.log(`[Office 批量转换] 成功，开始读取PDF文件`);
+            if (error) {
+              console.error(`[Office 批量转换] 失败: ${error.message}`);
+              console.error(
+                `[Office 批量转换] 重试次数: ${retryCount + 1}/${MAX_RETRIES}`
+              );
 
-            const pdfResults = [];
-
-            for (const pair of inputOutputPairs) {
-              const pdfPath = pair.output;
-              console.log(`[Office 批量转换] 检查PDF文件: ${pdfPath}`);
-              if (fs.existsSync(pdfPath)) {
-                const pdfBuffer = fs.readFileSync(pdfPath);
-                pdfResults.push({
-                  name: path.basename(pdfPath),
-                  data: pdfBuffer,
-                });
-                console.log(
-                  `[Office 批量转换] 成功读取PDF: ${pdfPath} (${pdfBuffer.length} bytes)`
-                );
+              // 检查是否需要重试
+              if (retryCount < MAX_RETRIES - 1) {
+                retryCount++;
+                setTimeout(executeConversion, RETRY_INTERVAL);
               } else {
-                console.warn(`[Office 批量转换] PDF文件不存在: ${pdfPath}`);
-                console.log(`[Office 批量转换] 临时目录内容:`);
-                const files = fs.readdirSync(tempDir);
-                files.forEach(file => {
-                  const filePath = path.join(tempDir, file);
-                  const stats = fs.statSync(filePath);
-                  console.log(`  ${file} (${stats.size} bytes)`);
-                });
+                // 重试次数用完，返回失败
+                resolve({ success: false, error: error.message });
+              }
+              return;
+            }
+
+            if (stdout.includes('BATCH_CONVERSION_SUCCESS')) {
+              const pdfResults = [];
+
+              for (const pair of inputOutputPairs) {
+                const pdfPath = pair.output;
+                if (fs.existsSync(pdfPath)) {
+                  const pdfBuffer = fs.readFileSync(pdfPath);
+                  pdfResults.push({
+                    name: path.basename(pdfPath),
+                    data: pdfBuffer,
+                  });
+                } else {
+                  console.warn(`[Office 批量转换] PDF文件不存在: ${pdfPath}`);
+                }
+              }
+
+              resolve({ success: true, results: pdfResults });
+            } else {
+              console.error(
+                `[Office 批量转换] 重试次数: ${retryCount + 1}/${MAX_RETRIES}`
+              );
+
+              // 检查是否需要重试
+              if (retryCount < MAX_RETRIES - 1) {
+                retryCount++;
+                console.log(`[Office 批量转换] ${RETRY_INTERVAL}ms 后重试...`);
+                setTimeout(executeConversion, RETRY_INTERVAL);
+              } else {
+                // 重试次数用完，返回失败
+                resolve({ success: false, error: '转换失败' });
               }
             }
+          }
+        );
+      } catch (error) {
+        console.error(`[Office 批量转换] 失败: ${error.message}`);
+        console.error(
+          `[Office 批量转换] 重试次数: ${retryCount + 1}/${MAX_RETRIES}`
+        );
 
-            if (fs.existsSync(tempDir)) {
-              fs.rmSync(tempDir, { recursive: true, force: true });
-            }
-
-            resolve({ success: true, results: pdfResults });
-          } else {
-            console.error(`[Office 批量转换] 输出:\n${stdout}`);
-            if (fs.existsSync(tempDir)) {
-              fs.rmSync(tempDir, { recursive: true, force: true });
-            }
-            resolve({ success: false, error: '转换失败' });
+        // 清理临时文件
+        if (tempDir && fs.existsSync(tempDir)) {
+          try {
+            fs.rmSync(tempDir, {
+              recursive: true,
+              force: true,
+            });
+          } catch (cleanupError) {
+            console.error(
+              `[Office 批量转换] 清理临时目录失败: ${cleanupError.message}`
+            );
           }
         }
-      );
-    } catch (error) {
-      console.error(`[Office 批量转换] 失败: ${error.message}`);
-      if (tempDir && fs.existsSync(tempDir)) {
-        fs.rmSync(tempDir, {
-          recursive: true,
-          force: true,
-        });
+
+        // 检查是否需要重试
+        if (retryCount < MAX_RETRIES - 1) {
+          retryCount++;
+          console.log(`[Office 批量转换] ${RETRY_INTERVAL}ms 后重试...`);
+          setTimeout(executeConversion, RETRY_INTERVAL);
+        } else {
+          // 重试次数用完，返回失败
+          resolve({ success: false, error: error.message });
+        }
       }
-      resolve({ success: false, error: error.message });
-    }
+    };
+
+    // 开始执行转换
+    executeConversion();
   });
 }
 

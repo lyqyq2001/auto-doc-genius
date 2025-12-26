@@ -62,9 +62,6 @@ async function convertPdfByOffice(docxFiles, sendProgress) {
       batches.push(docxFiles.slice(i, i + batchSize));
     }
 
-    console.log(
-      `[PDF转换] 文件数: ${fileCount}, 并行批次: ${batches.length}, 每批次: ${batchSize}`
-    );
     sendProgress?.({
       stage: 'converting',
       message: `开始转换，使用 ${batches.length} 个并行批次...`,
@@ -82,25 +79,10 @@ async function convertPdfByOffice(docxFiles, sendProgress) {
         inputOutputPairs.push({ input: docxPath, output: pdfPath });
       }
 
-      const batchResult = await convertBatchWordToPdf(
-        inputOutputPairs,
-        progress => {
-          sendProgress?.({
-            stage: 'converting',
-            batchIndex: batchIndex + 1,
-            totalBatches: batches.length,
-            progress: progress,
-            message: `批次 ${batchIndex + 1}/${batches.length}: ${progress}%`,
-          });
-        }
-      );
+      const batchResult = await convertBatchWordToPdf(inputOutputPairs);
 
-      try {
-        if (fs.existsSync(tempDir)) {
-          fs.rmSync(tempDir, { recursive: true, force: true });
-        }
-      } catch (e) {
-        console.warn(`清理临时目录失败 [批次${batchIndex}]:`, e);
+      if (fs.existsSync(tempDir)) {
+        fs.rmSync(tempDir, { recursive: true, force: true });
       }
 
       completedBatches++;
@@ -119,14 +101,8 @@ async function convertPdfByOffice(docxFiles, sendProgress) {
     const errors = [];
 
     batchResults.forEach((result, index) => {
-      console.log(`[批次${index + 1}] 结果:`, result);
       if (result.results && result.results.length > 0) {
-        console.log(
-          `[批次${index + 1}] 成功生成 ${result.results.length} 个PDF文件`
-        );
         pdfResults.push(...result.results);
-      } else {
-        console.warn(`[批次${index + 1}] 没有生成PDF文件`);
       }
       if (result.error) {
         errors.push(`批次${index + 1}: ${result.error}`);
