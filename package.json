@@ -11,6 +11,7 @@
     "docxtemplater": "^3.67.6",
     "element-plus": "^2.6.3",
     "file-saver": "^2.0.5",
+    "iconv-lite": "^0.7.1",
     "jszip": "^3.10.1",
     "pizzip": "^3.2.0",
     "temp": "^0.9.4",

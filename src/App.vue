@@ -338,107 +338,158 @@
 
     const startTime = Date.now();
 
+    let progressListener = null;
+
     try {
       // [{XXX01:'xxx',XXX02:'xxx',......} , ....]
       const excelData = await parseExcel(excelFile.value);
       // arraybuffer
       const wordTemplate = await readWordTemplate(wordFile.value);
       const zip = new JSZip();
-      const tempDocxList = [];
 
-      // 遍历Excel数据行
-      for (let i = 0; i < excelData.length; i++) {
-        progress.value = Math.round((i / excelData.length) * 100); // 进度百分比
-        progressText.value = `正在处理第 ${i + 1} 行，共 ${
-          excelData.length
-        } 行`;
+      // 如果是 PDF 模式，使用流式处理
+      if (exportFormat.value === 'pdf') {
+        progressText.value = '正在生成Word文档并转换PDF...';
 
-        const rowData = excelData[i];
+        // 监听PDF转换进度
+        progressListener = window.electronAPI.onPdfProgress(data => {
+          if (data.stage === 'converting') {
+            progress.value = Math.round(50 + (data.progress || 0) * 0.4);
+            progressText.value = data.message || '正在转换PDF...';
+          }
+        });
 
-        // 使用pizzip加载Word模板
-        const templateZip = new PizZip(wordTemplate);
-        // 遍历所有XML文件
-        Object.keys(templateZip.files).forEach(filename => {
-          if (filename.endsWith('.xml')) {
-            // 先去拿到所有以xml结尾的文件，templateZip.file(filename)拿到zipObject对象 再转成文本
-            const fileContent = templateZip.file(filename).asText();
+        const BATCH_SIZE = 10;
+        const pdfResults = [];
 
-            let updatedContent = fileContent;
+        for (let i = 0; i < excelData.length; i += BATCH_SIZE) {
+          const batch = excelData.slice(i, i + BATCH_SIZE);
+          const batchDocxList = [];
 
-            // 遍历所有数据键，替换模板中的占位符
-            Object.keys(rowData).forEach(key => {
-              const regex = new RegExp(key, 'g');
-              // 只替换没有花括号的，避免重复
-              if (!updatedContent.includes(`{${key}}`)) {
-                updatedContent = updatedContent.replace(regex, `{${key}}`);
+          for (let j = 0; j < batch.length; j++) {
+            const rowData = batch[j];
+            const globalIndex = i + j;
+
+            progress.value = Math.round((globalIndex / excelData.length) * 50);
+            progressText.value = `正在生成Word文档 (${globalIndex + 1}/${
+              excelData.length
+            })...`;
+
+            const templateZip = new PizZip(wordTemplate);
+            Object.keys(templateZip.files).forEach(filename => {
+              if (filename.endsWith('.xml')) {
+                const fileContent = templateZip.file(filename).asText();
+                let updatedContent = fileContent;
+
+                Object.keys(rowData).forEach(key => {
+                  const regex = new RegExp(key, 'g');
+                  if (!updatedContent.includes(`{${key}}`)) {
+                    updatedContent = updatedContent.replace(regex, `{${key}}`);
+                  }
+                });
+
+                templateZip.file(filename, updatedContent);
               }
             });
 
-            // 更新文件内容
-            templateZip.file(filename, updatedContent);
+            const doc = new Docxtemplater(templateZip, {
+              paragraphLoop: true,
+              linebreaks: true,
+              delimiters: {
+                start: '{',
+                end: '}',
+              },
+            });
+
+            doc.render(rowData);
+
+            const docxArrayBuffer = doc.getZip().generate({
+              type: 'arraybuffer',
+              mimeType:
+                'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            });
+
+            const firstKey = Object.keys(rowData)[0];
+            const baseFileName = rowData[firstKey] || `doc_${globalIndex + 1}`;
+
+            batchDocxList.push({
+              name: `${baseFileName}.docx`,
+              buffer: docxArrayBuffer,
+            });
           }
-        });
 
-        // 创建docxtemplater实例，模板中可以写XXX01或者{XXX01}, {}的形式是为了让用户更灵活的配置占位符的名称
-        const doc = new Docxtemplater(templateZip, {
-          paragraphLoop: true,
-          linebreaks: true,
-          // 确保分隔符配置正确
-          delimiters: {
-            start: '{',
-            end: '}',
-          },
-        });
-        // 将数据渲染到模板中 开始替换
-        doc.render(rowData);
+          progressText.value = `正在转换PDF (${i + 1}-${Math.min(
+            i + BATCH_SIZE,
+            excelData.length
+          )}/${excelData.length})...`;
 
-        // 生成Word文件，使用arraybuffer格式，方便后续转换
-        const docxArrayBuffer = doc.getZip().generate({
-          type: 'arraybuffer',
-          mimeType:
-            'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-        });
-
-        // 生成文件名，使用第一列数据或默认名称
-        const firstKey = Object.keys(rowData)[0];
-        const baseFileName = rowData[firstKey] || `doc_${i + 1}`;
-
-        // 直接添加Word文件到ZIP中
-        if (exportFormat.value === 'docx') {
-          zip.file(`${baseFileName}.docx`, docxArrayBuffer);
-        } else if (exportFormat.value === 'pdf') {
-          // 导出PDF：先存起来，稍后批量发给主进程
-          tempDocxList.push({
-            name: `${baseFileName}.docx`,
-            buffer: docxArrayBuffer,
-          });
-        }
-      }
-
-      // 如果是 PDF 模式，开始调用主进程转换
-      if (exportFormat.value === 'pdf' && tempDocxList.length > 0) {
-        progress.value = 100;
-        progressText.value =
-          '正在使用微软Office进行 Word 转 PDF，该过程较慢 请稍候...';
-
-        try {
-          // 调用主进程 API
           const result = await window.electronAPI.convertBatchToPdf(
-            tempDocxList,
+            batchDocxList
           );
 
           if (result.success) {
-            // 将返回的 PDF Buffer 加入 ZIP
-            result.results.forEach(pdfFile => {
-              zip.file(pdfFile.name, pdfFile.data);
-            });
+            pdfResults.push(...result.results);
+            progress.value = Math.round(
+              ((i + BATCH_SIZE) / excelData.length) * 90
+            );
           } else {
             throw new Error(result.error);
           }
-        } catch (e) {
-          ElMessage.error('PDF转换出错: ' + e.message);
-          generating.value = false;
-          return;
+        }
+
+        progressText.value = '正在打包PDF文件...';
+
+        pdfResults.forEach(pdfFile => {
+          zip.file(pdfFile.name, pdfFile.data);
+        });
+      } else {
+        // Word 模式：直接生成
+        for (let i = 0; i < excelData.length; i++) {
+          progress.value = Math.round((i / excelData.length) * 90);
+          progressText.value = `正在处理第 ${i + 1} 行，共 ${
+            excelData.length
+          } 行`;
+
+          const rowData = excelData[i];
+
+          const templateZip = new PizZip(wordTemplate);
+          Object.keys(templateZip.files).forEach(filename => {
+            if (filename.endsWith('.xml')) {
+              const fileContent = templateZip.file(filename).asText();
+              let updatedContent = fileContent;
+
+              Object.keys(rowData).forEach(key => {
+                const regex = new RegExp(key, 'g');
+                if (!updatedContent.includes(`{${key}}`)) {
+                  updatedContent = updatedContent.replace(regex, `{${key}}`);
+                }
+              });
+
+              templateZip.file(filename, updatedContent);
+            }
+          });
+
+          const doc = new Docxtemplater(templateZip, {
+            paragraphLoop: true,
+            linebreaks: true,
+            delimiters: {
+              start: '{',
+              end: '}',
+            },
+          });
+
+          doc.render(rowData);
+
+          const docxArrayBuffer = doc.getZip().generate({
+            type: 'arraybuffer',
+            mimeType:
+              'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+          });
+
+          const firstKey = Object.keys(rowData)[0];
+          const baseFileName = rowData[firstKey] || `doc_${i + 1}`;
+
+          zip.file(`${baseFileName}.docx`, docxArrayBuffer);
         }
       }
 
@@ -470,6 +521,9 @@
       console.error('生成失败:', error);
       ElMessage.error(`生成失败: ${error.message}`);
     } finally {
+      if (progressListener) {
+        progressListener();
+      }
       generating.value = false;
       progress.value = 0;
       progressText.value = '';

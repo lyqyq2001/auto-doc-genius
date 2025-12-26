@@ -1,6 +1,7 @@
 const { app, BrowserWindow, ipcMain } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const os = require('os');
 const temp = require('temp');
 const {
   checkWordInstallation,
@@ -34,55 +35,66 @@ const createWindow = () => {
   }
 };
 
-async function convertPdfByOffice(docxFiles) {
+async function convertPdfByOffice(docxFiles, sendProgress) {
   try {
-    // 根据文件数量确定并行度
     const fileCount = docxFiles.length;
-    const parallelCount = Math.min(Math.max(2, Math.ceil(fileCount / 3)), 4);
+    const cpuCount = os.cpus().length;
 
-    // 将文件分成多个批次
+    sendProgress?.({
+      stage: 'init',
+      message: `准备转换 ${fileCount} 个文件...`,
+    });
+
+    let parallelCount;
+    if (fileCount <= 5) {
+      parallelCount = 1;
+    } else if (fileCount <= 20) {
+      parallelCount = Math.min(2, cpuCount);
+    } else if (fileCount <= 50) {
+      parallelCount = Math.min(3, cpuCount);
+    } else {
+      parallelCount = Math.min(4, cpuCount);
+    }
+
     const batches = [];
     const batchSize = Math.ceil(fileCount / parallelCount);
     for (let i = 0; i < fileCount; i += batchSize) {
       batches.push(docxFiles.slice(i, i + batchSize));
     }
 
-    // 并行处理每个批次
+    console.log(
+      `[PDF转换] 文件数: ${fileCount}, 并行批次: ${batches.length}, 每批次: ${batchSize}`
+    );
+    sendProgress?.({
+      stage: 'converting',
+      message: `开始转换，使用 ${batches.length} 个并行批次...`,
+    });
+
+    let completedBatches = 0;
     const batchPromises = batches.map(async (batch, batchIndex) => {
-      // 创建一个临时目录用于存储批次文件 例如 C：\Users\12268\AppData\Local\Temp\autodocgenius_batch_0
       const tempDir = temp.mkdirSync(`autodocgenius_batch_${batchIndex}`);
       const inputOutputPairs = [];
-      // 准备批次的文件
-      for (const file of batch) {
-        //例如 C：\Users\12268\AppData\Local\Temp\autodocgenius_batch_0\test.docx
-        const docxPath = path.join(tempDir, file.name);
-        //例如 C：\Users\12268\AppData\Local\Temp\autodocgenius_batch_0\test.pdf
-        const pdfPath = path.join(tempDir, file.name.replace('.docx', '.pdf'));
-        // 将buffer写入docx文件
-        fs.writeFileSync(docxPath, Buffer.from(file.buffer));
 
+      for (const file of batch) {
+        const docxPath = path.join(tempDir, file.name);
+        const pdfPath = path.join(tempDir, file.name.replace('.docx', '.pdf'));
+        fs.writeFileSync(docxPath, Buffer.from(file.buffer));
         inputOutputPairs.push({ input: docxPath, output: pdfPath });
       }
 
-      // 使用批量转换函数
-      const batchResult = await convertBatchWordToPdf(inputOutputPairs);
-
-      // 读取转换后的PDF文件
-      const pdfResults = [];
-      if (batchResult.success) {
-        for (const pair of inputOutputPairs) {
-          const pdfPath = pair.output;
-          if (fs.existsSync(pdfPath)) {
-            const pdfBuffer = fs.readFileSync(pdfPath);
-            pdfResults.push({
-              name: path.basename(pdfPath),
-              data: pdfBuffer,
-            });
-          }
+      const batchResult = await convertBatchWordToPdf(
+        inputOutputPairs,
+        progress => {
+          sendProgress?.({
+            stage: 'converting',
+            batchIndex: batchIndex + 1,
+            totalBatches: batches.length,
+            progress: progress,
+            message: `批次 ${batchIndex + 1}/${batches.length}: ${progress}%`,
+          });
         }
-      }
+      );
 
-      // 清理临时文件
       try {
         if (fs.existsSync(tempDir)) {
           fs.rmSync(tempDir, { recursive: true, force: true });
@@ -91,38 +103,59 @@ async function convertPdfByOffice(docxFiles) {
         console.warn(`清理临时目录失败 [批次${batchIndex}]:`, e);
       }
 
-      return { results: pdfResults, error: batchResult.error };
+      completedBatches++;
+      sendProgress?.({
+        stage: 'converting',
+        progress: Math.round((completedBatches / batches.length) * 100),
+        message: `已完成 ${completedBatches}/${batches.length} 个批次`,
+      });
+
+      return { results: batchResult.results || [], error: batchResult.error };
     });
 
-    // 等待所有批次完成
     const batchResults = await Promise.all(batchPromises);
 
-    // 合并结果
     const pdfResults = [];
     const errors = [];
 
     batchResults.forEach((result, index) => {
+      console.log(`[批次${index + 1}] 结果:`, result);
       if (result.results && result.results.length > 0) {
+        console.log(
+          `[批次${index + 1}] 成功生成 ${result.results.length} 个PDF文件`
+        );
         pdfResults.push(...result.results);
-      } else if (result.error) {
+      } else {
+        console.warn(`[批次${index + 1}] 没有生成PDF文件`);
+      }
+      if (result.error) {
         errors.push(`批次${index + 1}: ${result.error}`);
       }
     });
+
+    console.log(
+      `[PDF转换] 总共生成 ${pdfResults.length} 个PDF文件，期望 ${fileCount} 个`
+    );
 
     if (errors.length > 0) {
       console.warn('[PDF] 部分批次转换失败:', errors.join('; '));
     }
 
+    sendProgress?.({ stage: 'completed', progress: 100, message: '转换完成' });
+
     return { success: true, results: pdfResults };
   } catch (error) {
+    sendProgress?.({ stage: 'error', message: `转换失败: ${error.message}` });
     return { success: false, error: error.message };
   }
 }
 
-
 //  注册 IPC 处理函数
 ipcMain.handle('batch-convert-pdf', async (_event, docxFiles) => {
-  return convertPdfByOffice(docxFiles);
+  const sendProgress = data => {
+    _event.sender.send('pdf-conversion-progress', data);
+  };
+  return convertPdfByOffice(docxFiles, sendProgress);
 });
 
 //  检查Office是否安装
