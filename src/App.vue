@@ -12,7 +12,6 @@
         </template>
 
         <el-upload
-          v-model:file-list="excelFileList"
           class="upload-demo"
           drag
           action="#"
@@ -39,7 +38,6 @@
         </template>
 
         <el-upload
-          v-model:file-list="wordFileList"
           class="upload-demo"
           drag
           action="#"
@@ -126,8 +124,6 @@
   // 文件状态
   const excelFile = ref(null);
   const wordFile = ref(null);
-  const excelFileList = ref([]);
-  const wordFileList = ref([]);
   const generating = ref(false);
   const progress = ref(0);
   const progressText = ref('');
@@ -221,15 +217,13 @@
   };
 
   // Excel文件上传处理
-  const handleExcelChange = (file, fileList) => {
+  const handleExcelChange = file => {
     excelFile.value = file.raw;
-    excelFileList.value = fileList;
   };
 
   // Word文件上传处理
-  const handleWordChange = (file, fileList) => {
+  const handleWordChange = file => {
     wordFile.value = file.raw;
-    wordFileList.value = fileList;
   };
 
   // 解析Excel文件
