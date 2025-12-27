@@ -310,22 +310,8 @@
 
     updatedContent = updatedContent.replace(
       checkboxPattern,
-      (match, key, optionsPart) => {
-        console.log('原始 optionsPart:', JSON.stringify(optionsPart));
-
+      (_, key, optionsPart) => {
         const excelValue = rowData[key];
-
-        const textMatches = optionsPart.matchAll(/<w:t[^>]*>([^<]*)<\/w:t>/g);
-        const textParts = [];
-
-        for (const m of textMatches) {
-          const text = m[1];
-          if (text.trim()) {
-            textParts.push(text);
-          }
-        }
-
-        console.log('提取的文本部分:', textParts);
 
         const selectedValues = excelValue
           ? excelValue
@@ -334,27 +320,44 @@
               .map(v => v.trim())
           : [];
 
-        let buildStr = '';
+        let result = optionsPart;
 
-        for (const part of textParts) {
-          const trimmedPart = part.trim();
-          if (!trimmedPart || trimmedPart === '□') continue;
+        const textTagPattern = /<w:t[^>]*>([^<]*)<\/w:t>/g;
+        let matchResult;
+        const allMatches = [];
 
-          const isSelected = selectedValues.some(
-            selectedValue =>
-              trimmedPart.includes(selectedValue) ||
-              selectedValue.includes(trimmedPart)
-          );
+        while ((matchResult = textTagPattern.exec(optionsPart)) !== null) {
+          allMatches.push({
+            fullMatch: matchResult[0],
+            text: matchResult[1],
+            index: matchResult.index,
+          });
+        }
 
-          if (isSelected) {
-            buildStr += `☑${trimmedPart} `;
-          } else {
-            buildStr += `□${trimmedPart} `;
+        for (let i = 0; i < allMatches.length; i++) {
+          const current = allMatches[i];
+
+          if (current.text.trim() === '□' && i + 1 < allMatches.length) {
+            const next = allMatches[i + 1];
+            const nextText = next.text.trim();
+
+            const isSelected = selectedValues.some(
+              selectedValue =>
+                nextText.includes(selectedValue) ||
+                selectedValue.includes(nextText)
+            );
+
+            if (isSelected) {
+              const newFullMatch = current.fullMatch.replace('□', '☑');
+              result =
+                result.substring(0, current.index) +
+                newFullMatch +
+                result.substring(current.index + current.fullMatch.length);
+            }
           }
         }
 
-        console.log('最终结果:', JSON.stringify(buildStr.trim()));
-        return buildStr.trim();
+        return result;
       }
     );
 
