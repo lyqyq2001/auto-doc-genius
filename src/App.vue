@@ -114,10 +114,7 @@
 <script setup>
   import { ref, computed } from 'vue';
   import { ElMessage, ElNotification } from 'element-plus';
-  import * as XLSX from 'xlsx';
   import { saveAs } from 'file-saver';
-  import PizZip from 'pizzip';
-  import Docxtemplater from 'docxtemplater';
   import JSZip from 'jszip';
   import { UploadFilled } from '@element-plus/icons-vue';
   import {
@@ -128,9 +125,9 @@
   } from './utils/fileUtils';
   import {
     parseExcel,
-    processCheckboxOptions,
     readWordTemplate,
   } from './utils/documentUtils';
+  import { generateDocx } from './utils/docxGenerator';
 
   // 文件状态
   const excelFile = ref(null);
@@ -223,48 +220,8 @@
               excelData.length
             })...`;
 
-            const templateZip = new PizZip(wordTemplate);
-            Object.keys(templateZip.files).forEach(filename => {
-              if (filename.endsWith('.xml')) {
-                const fileContent = templateZip.file(filename).asText();
-                let updatedContent = fileContent;
-
-                updatedContent = processCheckboxOptions(
-                  updatedContent,
-                  rowData
-                );
-
-                Object.keys(rowData).forEach(key => {
-                  if (key.startsWith('check')) return;
-                  const regex = new RegExp(key, 'g');
-                  if (!updatedContent.includes(`{${key}}`)) {
-                    updatedContent = updatedContent.replace(regex, `{${key}}`);
-                  }
-                });
-
-                templateZip.file(filename, updatedContent);
-              }
-            });
-            const doc = new Docxtemplater(templateZip, {
-              paragraphLoop: true,
-              linebreaks: true,
-            });
-
-            doc.render(rowData);
-
-            const docxArrayBuffer = doc.getZip().generate({
-              type: 'arraybuffer',
-              mimeType:
-                'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-            });
-
-            const firstKey = Object.keys(rowData)[0];
-            const baseFileName = rowData[firstKey] || `doc_${globalIndex + 1}`;
-
-            batchDocxList.push({
-              name: `${baseFileName}.docx`,
-              buffer: docxArrayBuffer,
-            });
+            const docx = generateDocx(wordTemplate, rowData, globalIndex);
+            batchDocxList.push(docx);
           }
 
           progressText.value = `正在转换PDF (${i + 1}-${Math.min(
@@ -300,42 +257,9 @@
           } 行`;
 
           const rowData = excelData[i];
+          const docx = generateDocx(wordTemplate, rowData, i);
 
-          const templateZip = new PizZip(wordTemplate);
-          Object.keys(templateZip.files).forEach(filename => {
-            if (filename.endsWith('.xml')) {
-              const fileContent = templateZip.file(filename).asText();
-              let updatedContent = fileContent;
-
-              updatedContent = processCheckboxOptions(updatedContent, rowData);
-
-              Object.keys(rowData).forEach(key => {
-                if (key.startsWith('check')) return;
-                const regex = new RegExp(key, 'g');
-                if (!updatedContent.includes(`{${key}}`)) {
-                  updatedContent = updatedContent.replace(regex, `{${key}}`);
-                }
-              });
-
-              templateZip.file(filename, updatedContent);
-            }
-          });
-
-          const doc = new Docxtemplater(templateZip, {
-            paragraphLoop: true,
-            linebreaks: true,
-          });
-
-          doc.render(rowData);
-          const docxArrayBuffer = doc.getZip().generate({
-            type: 'arraybuffer',
-            mimeType:
-              'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-          });
-          const firstKey = Object.keys(rowData)[0];
-          const baseFileName = rowData[firstKey] || `doc_${i + 1}`;
-
-          zip.file(`${baseFileName}.docx`, docxArrayBuffer);
+          zip.file(docx.name, docx.buffer);
         }
       }
 

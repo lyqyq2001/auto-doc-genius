@@ -1,4 +1,4 @@
-import * as XLSX from 'xlsx';
+import { read, utils } from 'xlsx';
 
 export const parseExcel = file => {
   return new Promise((resolve, reject) => {
@@ -6,10 +6,10 @@ export const parseExcel = file => {
     reader.onload = e => {
       try {
         const data = new Uint8Array(e.target.result);
-        const workbook = XLSX.read(data, { type: 'array' });
+        const workbook = read(data, { type: 'array' });
         const firstSheetName = workbook.SheetNames[0];
         const worksheet = workbook.Sheets[firstSheetName];
-        const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+        const jsonData = utils.sheet_to_json(worksheet, { header: 1 });
 
         if (jsonData.length < 3) {
           reject(
@@ -24,9 +24,7 @@ export const parseExcel = file => {
         const rows = jsonData
           .slice(2)
           .filter(row =>
-            row.some(
-              cell => cell !== undefined && cell !== null && cell !== ''
-            )
+            row.some(cell => cell !== undefined && cell !== null && cell !== '')
           );
 
         if (rows.length === 0) {
