@@ -302,6 +302,69 @@
     });
   };
 
+  // 处理多选项
+  const processCheckboxOptions = (content, rowData) => {
+    let updatedContent = content;
+
+    // 匹配多选项模式：{{checkXX□选项1  □选项2  ...}}
+    const checkboxPattern = /\{\{(check\d+)(.*?)\}\}/g;
+
+    updatedContent = updatedContent.replace(
+      checkboxPattern,
+      (_, key, optionsPart) => {
+        // 获取Excel中对应的值
+        const excelValue = rowData[key] || '';
+
+        // 确保 optionsPart 是字符串类型
+        let newOptionsPart = String(optionsPart || '');
+
+        // 移除所有 undefined
+        newOptionsPart = newOptionsPart.replace(/undefined/g, '');
+
+        // 移除末尾的 }}
+        newOptionsPart = newOptionsPart.replace(/\}\}\s*$/, '');
+
+        // 如果Excel中有值，处理选中状态
+        if (excelValue) {
+          // 将Excel中的值（可能包含多个值，用逗号分隔）转换为数组
+          const selectedValues = excelValue
+            .toString()
+            .split(/[，,、]/)
+            .map(v => v.trim());
+
+          // 使用 split 方法分割选项，然后重新构建
+          const parts = newOptionsPart.split('□');
+          let result = '';
+
+          for (let i = 0; i < parts.length; i++) {
+            const part = parts[i].trim();
+            if (!part) continue;
+
+            const isSelected = selectedValues.some(
+              selectedValue =>
+                part.includes(selectedValue) || selectedValue.includes(part)
+            );
+
+            if (isSelected) {
+              result += `☑${part} `;
+            } else {
+              result += `□${part} `;
+            }
+          }
+
+          newOptionsPart = result.trim();
+        }
+
+        // 返回纯文本，不包含{{}}包裹，避免被docxtemplater解析
+        // 最后清理一次，确保没有 undefined
+        const result = newOptionsPart.replace(/undefined/g, '').trim();
+        return result;
+      }
+    );
+
+    return updatedContent;
+  };
+
   // 读取Word模板文件
   const readWordTemplate = file => {
     return new Promise((resolve, reject) => {
@@ -382,6 +445,11 @@
                   }
                 });
 
+                updatedContent = processCheckboxOptions(
+                  updatedContent,
+                  rowData
+                );
+
                 templateZip.file(filename, updatedContent);
               }
             });
@@ -458,6 +526,8 @@
                   updatedContent = updatedContent.replace(regex, `{${key}}`);
                 }
               });
+
+              updatedContent = processCheckboxOptions(updatedContent, rowData);
 
               templateZip.file(filename, updatedContent);
             }
