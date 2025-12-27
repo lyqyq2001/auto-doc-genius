@@ -120,6 +120,17 @@
   import Docxtemplater from 'docxtemplater';
   import JSZip from 'jszip';
   import { UploadFilled } from '@element-plus/icons-vue';
+  import {
+    downloadExcelTemplate,
+    downloadWordTemplate,
+    beforeExcelUpload,
+    beforeWordUpload,
+  } from './utils/fileUtils';
+  import {
+    parseExcel,
+    processCheckboxOptions,
+    readWordTemplate,
+  } from './utils/documentUtils';
 
   // 文件状态
   const excelFile = ref(null);
@@ -139,39 +150,6 @@
       (exportFormat.value === 'pdf' && !officeInstalled.value)
     );
   });
-  // 下载Excel模板
-  const downloadExcelTemplate = () => {
-    try {
-      // 直接从public目录下载模板文件
-      const link = document.createElement('a');
-      link.href = '/Excel Template.xls';
-      link.download = 'Excel Template.xls';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      ElMessage.success('Excel模板下载成功');
-    } catch (error) {
-      console.error('下载Excel模板出错:', error);
-      ElMessage.error('Excel模板下载出错');
-    }
-  };
-
-  // 下载Word模板
-  const downloadWordTemplate = () => {
-    try {
-      // 直接从public目录下载模板文件
-      const link = document.createElement('a');
-      link.href = '/Word Template.docx';
-      link.download = 'Word Template.docx';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      ElMessage.success('Word模板下载成功');
-    } catch (error) {
-      console.error('下载Word模板出错:', error);
-      ElMessage.error('Word模板下载出错');
-    }
-  };
 
   // 检查Office是否安装
   const checkOfficeInstallation = async () => {
@@ -185,200 +163,14 @@
     }
   };
 
-  // 组件挂载时检查Office安装状态
   checkOfficeInstallation();
 
-  // Excel文件上传前校验
-  const beforeExcelUpload = file => {
-    const isExcel =
-      file.type ===
-        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
-      file.type === 'application/vnd.ms-excel' ||
-      file.name.endsWith('.xlsx') ||
-      file.name.endsWith('.xls');
-    if (!isExcel) {
-      ElMessage.error('请上传.xlsx或.xls格式的Excel文件');
-      return false;
-    }
-    return true;
-  };
-
-  // Word文件上传前校验
-  const beforeWordUpload = file => {
-    const isDOCX =
-      file.type ===
-        'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
-      file.name.endsWith('.docx');
-    if (!isDOCX) {
-      ElMessage.error('请上传.docx格式的Word模板文件');
-      return false;
-    }
-    return true;
-  };
-
-  // Excel文件上传处理
   const handleExcelChange = file => {
     excelFile.value = file.raw;
   };
 
-  // Word文件上传处理
   const handleWordChange = file => {
     wordFile.value = file.raw;
-  };
-
-  // 解析Excel文件
-  const parseExcel = file => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = e => {
-        try {
-          const data = new Uint8Array(e.target.result);
-          const workbook = XLSX.read(data, { type: 'array' });
-          const firstSheetName = workbook.SheetNames[0];
-          const worksheet = workbook.Sheets[firstSheetName];
-          // 转换为JSON数据，header:1表示返回一个二维数组，jsonData中每个元素都是一个数组，数组中的每个元素都是单元格的值
-          // 默认情况下，即无header参数时，返回的是一个对象数组，每个对象中的属性名是第一行单元格的内容，属性值是其余行单元格的值
-          const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
-
-          if (jsonData.length < 3) {
-            reject(
-              new Error(
-                'Excel表格格式不正确，需要包含描述行、表头行和至少一行数据'
-              )
-            );
-            return;
-          }
-
-          const headers = jsonData[1];
-          const rows = jsonData
-            .slice(2)
-            .filter(row =>
-              row.some(
-                cell => cell !== undefined && cell !== null && cell !== ''
-              )
-            );
-
-          if (rows.length === 0) {
-            reject(new Error('Excel表格中未检测到有效数据行'));
-            return;
-          }
-
-          const formattedRows = rows.map(row => {
-            const obj = {};
-            headers.forEach((header, index) => {
-              let value = row[index] || '';
-
-              if (typeof value === 'number') {
-                if (value > 25569) {
-                  const date = new Date((value - 25569) * 86400000);
-                  value = `${date.getFullYear()}年${(date.getMonth() + 1)
-                    .toString()
-                    .padStart(2, '0')}月${date
-                    .getDate()
-                    .toString()
-                    .padStart(2, '0')}日`;
-                } else if (value > 0 && value < 1) {
-                  const hours = Math.floor(value * 24);
-                  const minutes = Math.floor((value * 24 * 60) % 60);
-                  value = `${hours.toString().padStart(2, '0')}:${minutes
-                    .toString()
-                    .padStart(2, '0')}`;
-                }
-              }
-
-              obj[header] = value;
-            });
-
-            return obj;
-          });
-
-          resolve(formattedRows);
-        } catch (error) {
-          reject(new Error('Excel文件解析失败'));
-        }
-      };
-      reader.onerror = () => reject(new Error('文件读取失败'));
-      reader.readAsArrayBuffer(file);
-    });
-  };
-
-  // 处理多选项
-  const processCheckboxOptions = (content, rowData) => {
-    let updatedContent = content;
-
-    const checkboxPattern = /\{\{(check\d+)(.*?)\}\}/g;
-
-    updatedContent = updatedContent.replace(
-      checkboxPattern,
-      (_, key, optionsPart) => {
-        const excelValue = rowData[key];
-
-        const selectedValues = excelValue
-          ? excelValue
-              .toString()
-              .split(/[，,、]/)
-              .map(v => v.trim())
-          : [];
-
-        let result = optionsPart;
-
-        const textTagPattern = /<w:t[^>]*>([^<]*)<\/w:t>/g;
-        let matchResult;
-        const allMatches = [];
-
-        while ((matchResult = textTagPattern.exec(optionsPart)) !== null) {
-          allMatches.push({
-            fullMatch: matchResult[0],
-            text: matchResult[1],
-            index: matchResult.index,
-          });
-        }
-
-        for (let i = 0; i < allMatches.length; i++) {
-          const current = allMatches[i];
-
-          if (current.text.trim() === '□' && i + 1 < allMatches.length) {
-            const next = allMatches[i + 1];
-            const nextText = next.text.trim();
-
-            const isSelected = selectedValues.some(
-              selectedValue =>
-                nextText.includes(selectedValue) ||
-                selectedValue.includes(nextText)
-            );
-
-            if (isSelected) {
-              const newFullMatch = current.fullMatch.replace('□', '☑');
-              result =
-                result.substring(0, current.index) +
-                newFullMatch +
-                result.substring(current.index + current.fullMatch.length);
-            }
-          }
-        }
-
-        return result;
-      }
-    );
-
-    return updatedContent;
-  };
-
-  // 读取Word模板文件
-  const readWordTemplate = file => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = e => {
-        try {
-          const content = e.target.result;
-          resolve(content);
-        } catch (error) {
-          reject(new Error('Word模板读取失败'));
-        }
-      };
-      reader.onerror = () => reject(new Error('文件读取失败'));
-      reader.readAsArrayBuffer(file);
-    });
   };
 
   // 开始生成
