@@ -306,59 +306,55 @@
   const processCheckboxOptions = (content, rowData) => {
     let updatedContent = content;
 
-    // 匹配多选项模式：{{checkXX□选项1  □选项2  ...}}
     const checkboxPattern = /\{\{(check\d+)(.*?)\}\}/g;
 
     updatedContent = updatedContent.replace(
       checkboxPattern,
-      (_, key, optionsPart) => {
-        // 获取Excel中对应的值
-        const excelValue = rowData[key] || '';
+      (match, key, optionsPart) => {
+        console.log('原始 optionsPart:', JSON.stringify(optionsPart));
 
-        // 确保 optionsPart 是字符串类型
-        let newOptionsPart = String(optionsPart || '');
+        const excelValue = rowData[key];
 
-        // 移除所有 undefined
-        newOptionsPart = newOptionsPart.replace(/undefined/g, '');
+        const textMatches = optionsPart.matchAll(/<w:t[^>]*>([^<]*)<\/w:t>/g);
+        const textParts = [];
 
-        // 移除末尾的 }}
-        newOptionsPart = newOptionsPart.replace(/\}\}\s*$/, '');
-
-        // 如果Excel中有值，处理选中状态
-        if (excelValue) {
-          // 将Excel中的值（可能包含多个值，用逗号分隔）转换为数组
-          const selectedValues = excelValue
-            .toString()
-            .split(/[，,、]/)
-            .map(v => v.trim());
-
-          // 使用 split 方法分割选项，然后重新构建
-          const parts = newOptionsPart.split('□');
-          let result = '';
-
-          for (let i = 0; i < parts.length; i++) {
-            const part = parts[i].trim();
-            if (!part) continue;
-
-            const isSelected = selectedValues.some(
-              selectedValue =>
-                part.includes(selectedValue) || selectedValue.includes(part)
-            );
-
-            if (isSelected) {
-              result += `☑${part} `;
-            } else {
-              result += `□${part} `;
-            }
+        for (const m of textMatches) {
+          const text = m[1];
+          if (text.trim()) {
+            textParts.push(text);
           }
-
-          newOptionsPart = result.trim();
         }
 
-        // 返回纯文本，不包含{{}}包裹，避免被docxtemplater解析
-        // 最后清理一次，确保没有 undefined
-        const result = newOptionsPart.replace(/undefined/g, '').trim();
-        return result;
+        console.log('提取的文本部分:', textParts);
+
+        const selectedValues = excelValue
+          ? excelValue
+              .toString()
+              .split(/[，,、]/)
+              .map(v => v.trim())
+          : [];
+
+        let buildStr = '';
+
+        for (const part of textParts) {
+          const trimmedPart = part.trim();
+          if (!trimmedPart || trimmedPart === '□') continue;
+
+          const isSelected = selectedValues.some(
+            selectedValue =>
+              trimmedPart.includes(selectedValue) ||
+              selectedValue.includes(trimmedPart)
+          );
+
+          if (isSelected) {
+            buildStr += `☑${trimmedPart} `;
+          } else {
+            buildStr += `□${trimmedPart} `;
+          }
+        }
+
+        console.log('最终结果:', JSON.stringify(buildStr.trim()));
+        return buildStr.trim();
       }
     );
 
@@ -438,29 +434,25 @@
                 const fileContent = templateZip.file(filename).asText();
                 let updatedContent = fileContent;
 
+                updatedContent = processCheckboxOptions(
+                  updatedContent,
+                  rowData
+                );
+
                 Object.keys(rowData).forEach(key => {
+                  if (key.startsWith('check')) return;
                   const regex = new RegExp(key, 'g');
                   if (!updatedContent.includes(`{${key}}`)) {
                     updatedContent = updatedContent.replace(regex, `{${key}}`);
                   }
                 });
 
-                updatedContent = processCheckboxOptions(
-                  updatedContent,
-                  rowData
-                );
-
                 templateZip.file(filename, updatedContent);
               }
             });
-
             const doc = new Docxtemplater(templateZip, {
               paragraphLoop: true,
               linebreaks: true,
-              delimiters: {
-                start: '{',
-                end: '}',
-              },
             });
 
             doc.render(rowData);
@@ -520,14 +512,15 @@
               const fileContent = templateZip.file(filename).asText();
               let updatedContent = fileContent;
 
+              updatedContent = processCheckboxOptions(updatedContent, rowData);
+
               Object.keys(rowData).forEach(key => {
+                if (key.startsWith('check')) return;
                 const regex = new RegExp(key, 'g');
                 if (!updatedContent.includes(`{${key}}`)) {
                   updatedContent = updatedContent.replace(regex, `{${key}}`);
                 }
               });
-
-              updatedContent = processCheckboxOptions(updatedContent, rowData);
 
               templateZip.file(filename, updatedContent);
             }
@@ -536,20 +529,14 @@
           const doc = new Docxtemplater(templateZip, {
             paragraphLoop: true,
             linebreaks: true,
-            delimiters: {
-              start: '{',
-              end: '}',
-            },
           });
 
           doc.render(rowData);
-
           const docxArrayBuffer = doc.getZip().generate({
             type: 'arraybuffer',
             mimeType:
               'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
           });
-
           const firstKey = Object.keys(rowData)[0];
           const baseFileName = rowData[firstKey] || `doc_${i + 1}`;
 
