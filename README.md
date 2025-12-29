@@ -56,47 +56,7 @@
    - 支持 WPS Office 作为替代方案
    - 通过 PowerShell 脚本调用 COM 接口
 
-## 项目结构
-
-```
-vite-project/
-├── electron/                    # Electron 主进程代码
-│   ├── main.js                 # 主进程入口文件
-│   ├── preload.js              # 预加载脚本
-│   └── officeConverter.js      # Office 文档转换模块
-├── src/
-│   ├── utils/                  # 工具函数
-│   │   ├── documentUtils.js    # 文档处理工具
-│   │   ├── docxGenerator.js    # Word 文档生成器
-│   │   └── fileUtils.js        # 文件操作工具
-│   ├── App.vue                 # 主应用组件
-│   └── main.js                 # Vue 应用入口
-├── public/                     # 静态资源
-│   ├── Excel Template.xls      # Excel 模板示例
-│   ├── Word Template.docx      # Word 模板示例
-│   └── vite.svg                # Vite 图标
-├── .vscode/                    # VS Code 配置
-├── package.json                # 项目配置
-├── vite.config.js              # Vite 配置文件
-├── auto-imports.d.ts          # 自动导入类型定义
-└── components.d.ts            # 组件类型定义
-```
-
-## 安装与运行
-
-### 安装依赖
-
-```bash
-npm install
-```
-
-### 开发模式
-
-```bash
-npm run dev
-```
-
-### 构建应用
+## 构建应用
 
 ```bash
 npm run build
@@ -172,3 +132,7 @@ A: 请检查：
 1. Excel 中的选项名称是否与 Word 模板中的选项文本一致
 2. 是否使用了正确的分隔符
 3. Word 模板中的复选框是否使用 `□` 符号
+
+## 未来可能的拓展
+1. 支持图片的替换
+2. 转换成MarkDown
