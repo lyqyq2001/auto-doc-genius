@@ -27,6 +27,7 @@
   },
   "progress": {
     "preparing": "Preparing...",
+    "loadingImages": "Loading images...",
     "generatingAndConverting": "Generating Word documents and converting to PDF...",
     "convertingPdf": "Converting to PDF...",
     "generatingWord": "Generating Word document ({current}/{total})...",
@@ -40,6 +41,11 @@
     "pdfZipName": "Generated PDF Files.zip",
     "successTitle": "Success",
     "successMessage": "Generated {count} {format} file(s), packaged for download. Time elapsed: {seconds}s"
+  },
+  "image": {
+    "missingTitle": "Some images could not be loaded",
+    "missingMessage": "{count} image(s) failed to load (path not found, unsupported format or corrupted file). The corresponding placeholders will be left empty.",
+    "noElectron": "Reading local image files is not supported in this environment. Please use the desktop app for image replacement."
   },
   "message": {
     "excelDownloadSuccess": "Excel template downloaded successfully",

@@ -27,6 +27,7 @@
   },
   "progress": {
     "preparing": "准备中...",
+    "loadingImages": "正在读取图片...",
     "generatingAndConverting": "正在生成Word文档并转换PDF...",
     "convertingPdf": "正在转换PDF...",
     "generatingWord": "正在生成Word文档 ({current}/{total})...",
@@ -40,6 +41,11 @@
     "pdfZipName": "生成的PDF文件.zip",
     "successTitle": "成功",
     "successMessage": "已生成 {count} 个{format}文件，已打包下载。耗时: {seconds}秒"
+  },
+  "image": {
+    "missingTitle": "部分图片未能加载",
+    "missingMessage": "有 {count} 张图片读取失败（路径不存在、格式不支持或文件已损坏），对应位置将留空。",
+    "noElectron": "当前环境不支持读取本地图片文件，请在桌面客户端中使用图片替换功能"
   },
   "message": {
     "excelDownloadSuccess": "Excel模板下载成功",

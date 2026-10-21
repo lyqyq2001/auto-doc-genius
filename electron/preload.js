@@ -1,4 +1,4 @@
-const { contextBridge, ipcRenderer } = require('electron');
+const { contextBridge, ipcRenderer, webUtils } = require('electron');
 
 // 暴露安全的API到渲染进程
 contextBridge.exposeInMainWorld('electronAPI', {
@@ -14,4 +14,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
     return () =>
       ipcRenderer.removeListener('pdf-conversion-progress', listener);
   },
+  // 获取文件在磁盘上的真实路径（用于解析Excel中的相对图片路径）
+  getFilePath: file => webUtils.getPathForFile(file),
+  // 批量读取图片文件，返回 { 路径: { ok, base64, width, height, ext } }
+  readImageFiles: filePaths =>
+    ipcRenderer.invoke('read-image-files', filePaths),
 });

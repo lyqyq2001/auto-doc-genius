@@ -1,10 +1,22 @@
 import PizZip from 'pizzip';
 import Docxtemplater from 'docxtemplater';
 import { processCheckboxOptions } from './documentUtils';
+import { injectImages, isImageColumn } from './imageUtils';
 
-export const generateDocx = (wordTemplate, rowData, index) => {
+export const generateDocx = (
+  wordTemplate,
+  rowData,
+  index,
+  imageAssets = null,
+  excelDir = '',
+) => {
   const templateZip = new PizZip(wordTemplate);
-  
+
+  // 图片占位符注入（需在复选框处理和文本占位符包裹之前执行）
+  if (imageAssets) {
+    injectImages(templateZip, rowData, imageAssets, excelDir);
+  }
+
   Object.keys(templateZip.files).forEach(filename => {
     if (filename.endsWith('.xml')) {
       const fileContent = templateZip.file(filename).asText();
@@ -14,6 +26,7 @@ export const generateDocx = (wordTemplate, rowData, index) => {
 
       Object.keys(rowData).forEach(key => {
         if (key.startsWith('check')) return;
+        if (isImageColumn(key)) return;
         const regex = new RegExp(key, 'g');
         if (!updatedContent.includes(`{${key}}`)) {
           updatedContent = updatedContent.replace(regex, `{${key}}`);

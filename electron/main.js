@@ -2,6 +2,7 @@ const { app, BrowserWindow, ipcMain } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
+const { imageSize } = require('image-size');
 const {
   checkWordInstallation,
   convertBatchWordToPdf,
@@ -66,7 +67,7 @@ async function convertPdfByOffice(docxFiles, sendProgress) {
 
       if (batchResult.results && batchResult.results.length > 0) {
         console.log(
-          `[PDF转换] 转换完成，成功 ${batchResult.results.length}/${fileCount} 个文件`
+          `[PDF转换] 转换完成，成功 ${batchResult.results.length}/${fileCount} 个文件`,
         );
         sendProgress?.({
           stage: 'completed',
@@ -98,6 +99,54 @@ ipcMain.handle('batch-convert-pdf', async (_event, docxFiles) => {
 //  检查Office是否安装
 ipcMain.handle('check-office-installation', () => {
   return checkWordInstallation();
+});
+
+// 允许读取的图片扩展名白名单
+const IMAGE_EXTS = new Set(['.png', '.jpg', '.jpeg', '.gif', '.bmp']);
+
+// 读取图片文件（批量），返回 base64 内容与宽高信息
+ipcMain.handle('read-image-files', (_event, filePaths) => {
+  const result = {};
+
+  for (const filePath of filePaths) {
+    try {
+      const normalized = path.normalize(filePath);
+      const ext = path.extname(normalized).toLowerCase();
+
+      if (!IMAGE_EXTS.has(ext)) {
+        throw new Error(`不支持的图片格式: ${ext}`);
+      }
+
+      const buffer = fs.readFileSync(normalized);
+      let width = 200;
+      let height = 200;
+
+      try {
+        const dim = imageSize(buffer);
+        if (dim.width && dim.height) {
+          width = dim.width;
+          height = dim.height;
+        }
+      } catch (dimError) {
+        console.warn(
+          `[图片读取] 无法解析图片尺寸，使用默认尺寸: ${normalized}`,
+          dimError.message,
+        );
+      }
+
+      result[filePath] = {
+        ok: true,
+        base64: buffer.toString('base64'),
+        width,
+        height,
+        ext: ext.replace('.', ''),
+      };
+    } catch (error) {
+      result[filePath] = { ok: false, error: error.message };
+    }
+  }
+
+  return result;
 });
 
 // 创建主窗口

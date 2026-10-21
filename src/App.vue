@@ -134,6 +134,7 @@ import {
 } from './utils/fileUtils';
 import { parseExcel, readWordTemplate } from './utils/documentUtils';
 import { generateDocx } from './utils/docxGenerator';
+import { isImageColumn, collectImagePaths } from './utils/imageUtils';
 
 const { t } = useI18n();
 
@@ -178,6 +179,53 @@ const handleWordChange = file => {
   wordFile.value = file.raw;
 };
 
+// 预读取 Excel 中图片列引用的所有图片，返回 { imageAssets, excelDir }
+const preloadImages = async excelData => {
+  const headers = excelData.length > 0 ? Object.keys(excelData[0]) : [];
+  if (!headers.some(isImageColumn)) {
+    return { imageAssets: null, excelDir: '' };
+  }
+
+  if (
+    !window.electronAPI ||
+    !window.electronAPI.getFilePath ||
+    !window.electronAPI.readImageFiles
+  ) {
+    ElMessage.warning(t('image.noElectron'));
+    return { imageAssets: null, excelDir: '' };
+  }
+
+  let excelDir = '';
+  try {
+    const excelPath = window.electronAPI.getFilePath(excelFile.value);
+    if (excelPath) {
+      excelDir = excelPath.replace(/[\\/]+[^\\/]*$/, '');
+    }
+  } catch (error) {
+    console.error('获取Excel路径失败:', error);
+  }
+
+  const paths = collectImagePaths(excelData, excelDir);
+  if (paths.length === 0) {
+    return { imageAssets: {}, excelDir };
+  }
+
+  progressText.value = t('progress.loadingImages');
+  const imageAssets = (await window.electronAPI.readImageFiles(paths)) || {};
+
+  const failedPaths = paths.filter(p => !imageAssets[p] || !imageAssets[p].ok);
+  if (failedPaths.length > 0) {
+    console.warn('以下图片读取失败:', failedPaths);
+    ElNotification.warning({
+      title: t('image.missingTitle'),
+      message: t('image.missingMessage', { count: failedPaths.length }),
+      duration: 5000,
+    });
+  }
+
+  return { imageAssets, excelDir };
+};
+
 // 开始生成
 const startGenerate = async () => {
   if (!excelFile.value || !wordFile.value) {
@@ -198,6 +246,10 @@ const startGenerate = async () => {
     const excelData = await parseExcel(excelFile.value);
     // arraybuffer
     const wordTemplate = await readWordTemplate(wordFile.value);
+
+    // 图片替换：预读取所有被引用的图片
+    const { imageAssets, excelDir } = await preloadImages(excelData);
+
     const zip = new JSZip();
 
     // 如果是 PDF 模式，使用流式处理
@@ -229,7 +281,13 @@ const startGenerate = async () => {
             total: excelData.length,
           });
 
-          const docx = generateDocx(wordTemplate, rowData, globalIndex);
+          const docx = generateDocx(
+            wordTemplate,
+            rowData,
+            globalIndex,
+            imageAssets,
+            excelDir,
+          );
           batchDocxList.push(docx);
         }
 
@@ -267,7 +325,13 @@ const startGenerate = async () => {
         });
 
         const rowData = excelData[i];
-        const docx = generateDocx(wordTemplate, rowData, i);
+        const docx = generateDocx(
+          wordTemplate,
+          rowData,
+          i,
+          imageAssets,
+          excelDir,
+        );
 
         zip.file(docx.name, docx.buffer);
       }
