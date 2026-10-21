@@ -91,6 +91,21 @@ describe('parseExcel', () => {
     ]);
   });
 
+  it('保留 Excel 时间边界值，午夜格式化为 00:00', async () => {
+    const file = buildExcelFile({
+      A2: { t: 's', v: 'midnight' },
+      B2: { t: 's', v: 'lateNight' },
+      C2: { t: 's', v: 'ratio' },
+      A3: { t: 'n', v: 0, z: 'hh:mm' },
+      B3: { t: 'n', v: 0.99999, z: 'hh:mm' },
+      C3: { t: 'n', v: 0.25, z: '0.00' },
+    });
+
+    await expect(parseExcel(file)).resolves.toEqual([
+      { midnight: '00:00', lateNight: '23:59', ratio: 0.25 },
+    ]);
+  });
+
   it('中文环境下日期使用中文格式', async () => {
     i18n.global.locale.value = 'zh';
     const file = buildExcelFile({

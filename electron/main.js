@@ -76,6 +76,10 @@ async function convertPdfByOffice(docxFiles, sendProgress) {
         });
         return { success: true, results: batchResult.results };
       }
+
+      const error = batchResult.error || 'PDF conversion failed';
+      sendProgress?.({ stage: 'error', message: `转换失败: ${error}` });
+      return { success: false, error };
     } finally {
       if (fs.existsSync(tempDir)) {
         fs.rmSync(tempDir, { recursive: true, force: true });

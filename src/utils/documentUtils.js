@@ -92,7 +92,7 @@ export const parseExcel = file => {
               const cellFormat = cell && cell.z;
 
               if (cellFormat && SSF.is_date(cellFormat)) {
-                if (value > 0 && value < 1) {
+                if (value >= 0 && value < 1) {
                   value = formatTime(value);
                 } else if (value >= 1) {
                   value = formatDate(serialToDate(value));
