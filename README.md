@@ -1,174 +1,151 @@
 # AutoDoc Genius
 
-## 项目概述
+**English** | [简体中文](./README.zh-CN.md)
 
-**AutoDoc Genius** 是一个基于 Electron + Vue 3 的桌面应用程序，用于批量生成 Word/PDF 报告。该工具能够读取 Excel 数据表中的多行数据，结合 Word 模板文件，自动生成对应数量的 Word 或 PDF 报告文件。
+## Project Overview
 
-## 技术栈
+**AutoDoc Genius** is a desktop application built with Electron + Vue 3 for batch generating Word/PDF reports. The tool reads multiple rows of data from an Excel spreadsheet and combines them with a Word template file to automatically generate the corresponding number of Word or PDF report files.
 
-- **Vue 3** - 现代化前端框架
-- **Element Plus** - Vue 3 组件库，提供美观的 UI 组件
-- **Vite** - 现代化的前端构建工具
-- **XLSX.js** - Excel 文件解析库
-- **Docxtemplater** - Word 模板渲染引擎
-- **Pizzip** - ZIP 文件处理库
-- **JSZip** - 创建和读取 ZIP 文件
-- **File-saver** - 文件下载工具
+### Core Features
 
-- **Electron** - 跨平台桌面应用框架
-- **Vite-plugin-electron** - Vite 与 Electron 集成插件
+1. **Excel Data Reading**
+   - Supports .xlsx and .xls formats
+   - Automatically parses headers and data rows
+   - Automatic handling of date and time formats
 
-- **PowerShell 脚本** - 调用 Office 应用进行 Word 转 PDF
-- **Microsoft Word COM 接口** - 文档格式转换
-- **WPS Office 兼容** - 支持 WPS 作为 Office 替代品
+2. **Word Template Processing**
+   - Supports .docx template files
+   - Placeholder replacement mechanism (using markers such as XXX01, XXX02)
+   - Dynamically generates personalized documents
 
-## 功能特性
+3. **Multi-Option Support**
+   - Supports checkbox template functionality
+   - Uses `{{check01XXX}}{{check02XXX}}` style markers for multi-option placeholders
+   - In Excel, separate multiple options with commas, Chinese commas, or the enumeration comma (、)
+   - Automatically marks selected checkboxes with `☑` and keeps unselected ones as `□`
 
-### 核心功能
+4. **Batch Document Generation**
+   - Supports export to Word (.docx) format
+   - Supports export to PDF format (requires an Office environment)
+   - Progress bar shows generation progress
+   - Automatically generates a ZIP archive
 
-1. **Excel 数据读取**
+5. **Office Integration**
+   - Detects Microsoft Word installation status
+   - Supports WPS Office as an alternative
+   - Invokes the COM interface via PowerShell scripts
 
-   - 支持 .xlsx 和 .xls 格式
-   - 自动解析表头和数据行
-   - 日期和时间格式自动处理
-
-2. **Word 模板处理**
-
-   - 支持 .docx 模板文件
-   - 占位符替换机制（使用 XXX01、XXX02 等标记）
-   - 动态生成个性化文档
-
-3. **多选项支持**
-
-   - 支持复选框模板功能
-   - 使用 `{{check01XXX}}{{check02XXX}}`等 格式标记多选项占位符
-   - Excel 中使用逗号、中文逗号或顿号分隔多个选项
-   - 自动将选中的复选框标记为 `☑`，未选中的保持 `□`
-
-4. **批量文档生成**
-   - 支持导出为 Word (.docx) 格式
-   - 支持导出为 PDF 格式（需要 Office 环境）
-   - 进度条显示生成进度
-   - 自动生成 ZIP 压缩包
-   
-5. **Office 集成**
-   - 检测 Microsoft Word 安装状态
-   - 支持 WPS Office 作为替代方案
-   - 通过 PowerShell 脚本调用 COM 接口
-
-## 项目结构
+## Project Structure
 
 ```
 vite-project/
-├── electron/                    # Electron 主进程代码
-│   ├── main.js                 # 主进程入口文件
-│   ├── preload.js              # 预加载脚本
-│   └── officeConverter.js      # Office 文档转换模块
+├── electron/                    # Electron main process code
+│   ├── main.js                 # Main process entry file
+│   ├── preload.js              # Preload script
+│   └── officeConverter.js      # Office document conversion module
 ├── src/
-│   ├── utils/                  # 工具函数
-│   │   ├── documentUtils.js    # 文档处理工具
-│   │   ├── docxGenerator.js    # Word 文档生成器
-│   │   └── fileUtils.js        # 文件操作工具
-│   ├── App.vue                 # 主应用组件
-│   └── main.js                 # Vue 应用入口
-├── public/                     # 静态资源
-│   ├── Excel Template.xls      # Excel 模板示例
-│   ├── Word Template.docx      # Word 模板示例
-│   └── vite.svg                # Vite 图标
-├── .vscode/                    # VS Code 配置
-├── package.json                # 项目配置
-├── vite.config.js              # Vite 配置文件
-├── auto-imports.d.ts          # 自动导入类型定义
-└── components.d.ts            # 组件类型定义
+│   ├── utils/                  # Utility functions
+│   │   ├── documentUtils.js    # Document processing utilities
+│   │   ├── docxGenerator.js    # Word document generator
+│   │   └── fileUtils.js        # File operation utilities
+│   ├── App.vue                 # Main application component
+│   └── main.js                 # Vue application entry
+├── public/                     # Static assets
+│   ├── Excel Template.xls      # Sample Excel template
+│   ├── Word Template.docx      # Sample Word template
+│   └── vite.svg                # Vite icon
+├── .vscode/                    # VS Code configuration
+├── package.json                # Project configuration
+├── vite.config.js              # Vite configuration file
+├── auto-imports.d.ts           # Auto-import type definitions
+└── components.d.ts             # Component type definitions
 ```
 
-## 安装与运行
+## Installation & Running
 
-### 安装依赖
+### Install Dependencies
 
 ```bash
 npm install
 ```
 
-### 开发模式
+### Development Mode
 
 ```bash
 npm run dev
 ```
 
-### 构建应用
+### Build the Application
 
 ```bash
 npm run build
 ```
 
-构建完成后，安装包将生成在 `release` 目录中。
+After the build completes, the installer package will be generated in the `release` directory.
 
-## 使用方法
+## Usage
 
-1. **准备 Excel 数据表**
+1. **Prepare the Excel Spreadsheet**
+   - Row 1: Description information (optional)
+   - Row 2: Field names (used for template placeholders)
+   - Row 3 onwards: Data rows
 
-   - 第一行：描述信息（可选）
-   - 第二行：字段名（用于模板占位符）
-   - 第三行起：数据行
+2. **Prepare the Word Template**
+   - Use markers such as XXX01, XXX02 for regular placeholders
+   - Placeholders must correspond to the Excel field names
+   - Use the `{{checkXXX}}` format to mark multi-option placeholders
+   - Inside `{{checkXXX}}`, define options using the `□ Option1 □ Option2 □ Option3` format
 
-2. **准备 Word 模板**
+3. **Multi-Option Usage Example**
+   - **Excel header**: `check01`
+   - **Excel data**: `Swimming,Running,Reading` (separated by commas, Chinese commas, or the enumeration comma)
+   - **Word template**: `{{check01□ Swimming □ Running □ Reading □ Programming}}`
+   - **Generated result**: `☑ Swimming ☑ Running ☑ Reading □ Programming`
 
-   - 使用 XXX01、XXX02 等格式标记普通占位符
-   - 占位符需与 Excel 字段名对应
-   - 使用 `{{checkXXX}}` 格式标记多选项占位符
-   - 在 `{{checkXXX}}` 中使用 `□ 选项1 □ 选项2 □ 选项3` 格式定义选项
+4. **Upload Files and Generate**
+   - Upload the Excel file and the Word template
+   - Select the export format (Word or PDF)
+   - Click the generate button
+   - Download the generated ZIP file
 
-3. **多选项使用示例**
-   - **Excel 表头**: `check01`
-   - **Excel 数据**: `游泳,跑步,阅读` （使用逗号、中文逗号或顿号分隔）
-   - **Word 模板**: `{{check01□ 游泳 □ 跑步 □ 阅读 □ 编程}}`
-   - **生成结果**: `☑ 游泳 ☑ 跑步 ☑ 阅读 □ 编程`
-   
-4. **上传文件并生成**
-   - 上传 Excel 文件和 Word 模板
-   - 选择导出格式（Word 或 PDF）
-   - 点击生成按钮
-   - 下载生成的 ZIP 文件
+## Notes
 
-## 注意事项
+- The PDF export feature requires Microsoft Word or WPS Office to be installed
+- Make sure the placeholders in the template exactly match the Excel headers
+- Generating a large batch of documents may take a while, please be patient
+- The generated ZIP file contains all the generated documents
 
-- PDF 导出功能需要安装 Microsoft Word 或 WPS Office
-- 确保模板中的占位符与 Excel 表头完全匹配
-- 大批量文档生成可能需要较长时间，请耐心等待
-- 生成的 ZIP 文件包含所有生成的文档
+## FAQ
 
-## 常见问题
+**Q: What should I do if PDF export fails?**
 
-**Q: PDF 导出失败怎么办？**
+A: Please check whether Microsoft Word or WPS Office is installed, and make sure Word documents can be opened normally.
 
-A: 请检查是否安装了 Microsoft Word 或 WPS Office，并确保可以正常打开 Word 文档。
+**Q: The generated document format is incorrect?**
 
-**Q: 生成的文档格式不正确？**
+A: Please check whether the Word template file format is correct and whether the placeholders match the Excel headers.
 
-A: 请检查 Word 模板文件格式是否正确，占位符是否与 Excel 表头匹配。
+**Q: How do I customize templates?**
 
-**Q: 如何自定义模板？**
+A: In a Word document, use markers such as XXX01, XXX02 as placeholders. These markers will be replaced with the data from the corresponding Excel columns.
 
-A: 在 Word 文档中使用 XXX01、XXX02 等标记作为占位符，这些标记会被 Excel 中对应列的数据替换。
-
-**Q: 多选项功能如何使用？**
+**Q: How do I use the multi-option feature?**
 
 A:
 
-1. 在 Excel 中使用 `check` 开头的字段名（如 `check01`）
-2. 在单元格中使用逗号、中文逗号或顿号分隔多个选项（如 `游泳,跑步,阅读`）
-3. 在 Word 模板中使用 `{{check01}}` 包裹复选框选项（如 `{{check01□ 游泳 □ 跑步 □ 阅读}}`）
-4. 系统会自动将选中的选项标记为 `☑`
+1. Use field names starting with `check` in Excel (e.g., `check01`)
+2. In the cell, separate multiple options with commas, Chinese commas, or the enumeration comma (e.g., `Swimming,Running,Reading`)
+3. In the Word template, wrap the checkbox options with `{{check01}}` (e.g., `{{check01□ Swimming □ Running □ Reading}}`)
+4. The system will automatically mark the selected options with `☑`
 
-**Q: 多选项的分隔符支持哪些？**
+**Q: Which separators are supported for multi-options?**
 
-A: 支持英文逗号 `,`、中文逗号 `，` 和顿号 `、` 作为选项分隔符。
+A: The English comma `,`, the Chinese comma `，`, and the enumeration comma `、` are supported as option separators.
 
-**Q: 复选框没有正确勾选怎么办？**
+**Q: What should I do if checkboxes are not checked correctly?**
 
-A: 请检查：
+A: Please check:
 
-1. Excel 中的选项名称是否与 Word 模板中的选项文本一致
-2. 是否使用了正确的分隔符
-3. Word 模板中的复选框是否使用 `□` 符号
+1. Whether the option names in Excel match the option text in the Word template
+2. Whether the correct separators are used
+3. Whether the checkboxes in the Word template use the `□` symbol
