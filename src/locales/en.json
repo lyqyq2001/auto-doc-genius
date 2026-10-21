@@ -1,0 +1,57 @@
+{
+  "title": "Excel to Report Batch Generator",
+  "format": {
+    "date": "{day}-{monthShort}-{year}"
+  },
+  "upload": {
+    "excelTitle": "Upload Excel Data Sheet",
+    "wordTitle": "Upload Word Template",
+    "dragOrClick": "Drag file here or ",
+    "clickToUpload": "click to upload",
+    "excelTip": "Please upload an Excel file in .xlsx or .xls format",
+    "wordTip": "Please upload a Word template file in .docx format"
+  },
+  "download": {
+    "excelButton": "Download Excel sample template (editable)",
+    "wordButton": "Download Word sample template (editable)"
+  },
+  "export": {
+    "word": "Export Word",
+    "pdf": "Export PDF"
+  },
+  "generate": {
+    "start": "Start Generating Reports",
+    "noOffice": "(Office not installed, cannot generate PDF)",
+    "uploadFirst": "Please upload the Excel file and Word template file first",
+    "failed": "Generation failed: {message}"
+  },
+  "progress": {
+    "preparing": "Preparing...",
+    "generatingAndConverting": "Generating Word documents and converting to PDF...",
+    "convertingPdf": "Converting to PDF...",
+    "generatingWord": "Generating Word document ({current}/{total})...",
+    "convertingPdfBatch": "Converting to PDF ({start}-{end}/{total})...",
+    "packagingPdf": "Packaging PDF files...",
+    "processingRow": "Processing row {current} of {total}",
+    "packaging": "Packaging files..."
+  },
+  "result": {
+    "wordZipName": "Generated Word Files.zip",
+    "pdfZipName": "Generated PDF Files.zip",
+    "successTitle": "Success",
+    "successMessage": "Generated {count} {format} file(s), packaged for download. Time elapsed: {seconds}s"
+  },
+  "message": {
+    "excelDownloadSuccess": "Excel template downloaded successfully",
+    "excelDownloadError": "Error downloading Excel template",
+    "wordDownloadSuccess": "Word template downloaded successfully",
+    "wordDownloadError": "Error downloading Word template"
+  },
+  "error": {
+    "excelFormat": "Invalid Excel format. It must contain a description row, a header row and at least one data row",
+    "excelNoData": "No valid data rows found in the Excel sheet",
+    "excelParseFailed": "Failed to parse the Excel file",
+    "fileReadFailed": "Failed to read the file",
+    "wordReadFailed": "Failed to read the Word template"
+  }
+}

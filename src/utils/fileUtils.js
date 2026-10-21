@@ -1,30 +1,38 @@
+// 根据 i18n 当前语言选择对应的模板文件，非中文一律按英文处理
+import { isUserLanguageChinese, t } from '../i18n';
+
+const triggerDownload = fileName => {
+  const link = document.createElement('a');
+  link.href = `/${encodeURIComponent(fileName)}`;
+  link.download = fileName;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+};
+
 export const downloadExcelTemplate = () => {
   try {
-    const link = document.createElement('a');
-    link.href = '/Excel Template.xls';
-    link.download = 'Excel Template.xls';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    ElMessage.success('Excel模板下载成功');
+    const fileName = isUserLanguageChinese()
+      ? 'Excel Template.xls'
+      : 'Excel Template - (English).xls';
+    triggerDownload(fileName);
+    ElMessage.success(t('message.excelDownloadSuccess'));
   } catch (error) {
     console.error('下载Excel模板出错:', error);
-    ElMessage.error('Excel模板下载出错');
+    ElMessage.error(t('message.excelDownloadError'));
   }
 };
 
 export const downloadWordTemplate = () => {
   try {
-    const link = document.createElement('a');
-    link.href = '/Word Template.docx';
-    link.download = 'Word Template.docx';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    ElMessage.success('Word模板下载成功');
+    const fileName = isUserLanguageChinese()
+      ? 'Word Template.docx'
+      : 'Word Template (English).docx';
+    triggerDownload(fileName);
+    ElMessage.success(t('message.wordDownloadSuccess'));
   } catch (error) {
     console.error('下载Word模板出错:', error);
-    ElMessage.error('Word模板下载出错');
+    ElMessage.error(t('message.wordDownloadError'));
   }
 };
 
@@ -36,7 +44,7 @@ export const beforeExcelUpload = file => {
     file.name.endsWith('.xlsx') ||
     file.name.endsWith('.xls');
   if (!isExcel) {
-    ElMessage.error('请上传.xlsx或.xls格式的Excel文件');
+    ElMessage.error(t('upload.excelTip'));
     return false;
   }
   return true;
@@ -48,7 +56,7 @@ export const beforeWordUpload = file => {
       'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
     file.name.endsWith('.docx');
   if (!isDOCX) {
-    ElMessage.error('请上传.docx格式的Word模板文件');
+    ElMessage.error(t('upload.wordTip'));
     return false;
   }
   return true;

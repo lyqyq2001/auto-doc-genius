@@ -1,0 +1,57 @@
+{
+  "title": "Excel转报告批量生成器",
+  "format": {
+    "date": "{year}年{month}月{day}日"
+  },
+  "upload": {
+    "excelTitle": "上传Excel数据表",
+    "wordTitle": "上传Word模板",
+    "dragOrClick": "拖拽文件到此处或",
+    "clickToUpload": "点击上传",
+    "excelTip": "请上传.xlsx或.xls格式的Excel文件",
+    "wordTip": "请上传.docx格式的Word模板文件"
+  },
+  "download": {
+    "excelButton": "下载excel使用示例模板（可修改）",
+    "wordButton": "下载word使用示例模板（可修改）"
+  },
+  "export": {
+    "word": "导出Word",
+    "pdf": "导出PDF"
+  },
+  "generate": {
+    "start": "开始生成报告",
+    "noOffice": "(未安装Office，无法生成PDF)",
+    "uploadFirst": "请先上传Excel文件和Word模板文件",
+    "failed": "生成失败: {message}"
+  },
+  "progress": {
+    "preparing": "准备中...",
+    "generatingAndConverting": "正在生成Word文档并转换PDF...",
+    "convertingPdf": "正在转换PDF...",
+    "generatingWord": "正在生成Word文档 ({current}/{total})...",
+    "convertingPdfBatch": "正在转换PDF ({start}-{end}/{total})...",
+    "packagingPdf": "正在打包PDF文件...",
+    "processingRow": "正在处理第 {current} 行，共 {total} 行",
+    "packaging": "正在打包文件..."
+  },
+  "result": {
+    "wordZipName": "生成的Word文件.zip",
+    "pdfZipName": "生成的PDF文件.zip",
+    "successTitle": "成功",
+    "successMessage": "已生成 {count} 个{format}文件，已打包下载。耗时: {seconds}秒"
+  },
+  "message": {
+    "excelDownloadSuccess": "Excel模板下载成功",
+    "excelDownloadError": "Excel模板下载出错",
+    "wordDownloadSuccess": "Word模板下载成功",
+    "wordDownloadError": "Word模板下载出错"
+  },
+  "error": {
+    "excelFormat": "Excel表格格式不正确，需要包含描述行、表头行和至少一行数据",
+    "excelNoData": "Excel表格中未检测到有效数据行",
+    "excelParseFailed": "Excel文件解析失败",
+    "fileReadFailed": "文件读取失败",
+    "wordReadFailed": "Word模板读取失败"
+  }
+}

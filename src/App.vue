@@ -1,13 +1,13 @@
 <template>
   <div class="app-container">
-    <h1 class="title">Excel转报告批量生成器</h1>
+    <h1 class="title">{{ t('title') }}</h1>
 
     <div class="card-container">
       <!-- Excel上传区域 -->
       <el-card class="upload-card">
         <template #header>
           <div class="card-header">
-            <span>上传Excel数据表</span>
+            <span>{{ t('upload.excelTitle') }}</span>
           </div>
         </template>
 
@@ -22,9 +22,12 @@
           :show-file-list="true"
         >
           <el-icon class="el-icon--upload"><upload-filled /></el-icon>
-          <div class="el-upload__text">拖拽文件到此处或<em>点击上传</em></div>
+          <div class="el-upload__text">
+            {{ t('upload.dragOrClick')
+            }}<em>{{ t('upload.clickToUpload') }}</em>
+          </div>
           <template #tip>
-            <div class="el-upload__tip">请上传.xlsx或.xls格式的Excel文件</div>
+            <div class="el-upload__tip">{{ t('upload.excelTip') }}</div>
           </template>
         </el-upload>
       </el-card>
@@ -33,7 +36,7 @@
       <el-card class="upload-card">
         <template #header>
           <div class="card-header">
-            <span>上传Word模板</span>
+            <span>{{ t('upload.wordTitle') }}</span>
           </div>
         </template>
 
@@ -48,9 +51,12 @@
           :show-file-list="true"
         >
           <el-icon class="el-icon--upload"><upload-filled /></el-icon>
-          <div class="el-upload__text">拖拽文件到此处或<em>点击上传</em></div>
+          <div class="el-upload__text">
+            {{ t('upload.dragOrClick')
+            }}<em>{{ t('upload.clickToUpload') }}</em>
+          </div>
           <template #tip>
-            <div class="el-upload__tip">请上传.docx格式的Word模板文件</div>
+            <div class="el-upload__tip">{{ t('upload.wordTip') }}</div>
           </template>
         </el-upload>
       </el-card>
@@ -65,18 +71,20 @@
             size="medium"
             style="margin-right: 10px"
           >
-            下载excel使用示例模板（可修改）
+            {{ t('download.excelButton') }}
           </el-button>
           <el-button type="info" @click="downloadWordTemplate" size="medium">
-            下载word使用示例模板（可修改）
+            {{ t('download.wordButton') }}
           </el-button>
         </div>
 
         <!-- 导出格式选择 -->
         <div class="export-options">
           <el-radio-group v-model="exportFormat" size="large">
-            <el-radio-button label="docx">导出Word</el-radio-button>
-            <el-radio-button label="pdf">导出PDF</el-radio-button>
+            <el-radio-button label="docx">{{
+              t('export.word')
+            }}</el-radio-button>
+            <el-radio-button label="pdf">{{ t('export.pdf') }}</el-radio-button>
           </el-radio-group>
         </div>
 
@@ -88,12 +96,12 @@
           @click="startGenerate"
           size="large"
         >
-          开始生成报告
+          {{ t('generate.start') }}
           <span
             v-if="exportFormat === 'pdf' && !officeInstalled"
             style="color: #f56c6c; font-size: 14px"
           >
-            (未安装Office，无法生成PDF)</span
+            {{ t('generate.noOffice') }}</span
           >
         </el-button>
 
@@ -112,273 +120,277 @@
 </template>
 
 <script setup>
-  import { ref, computed } from 'vue';
-  import { ElMessage, ElNotification } from 'element-plus';
-  import { saveAs } from 'file-saver';
-  import JSZip from 'jszip';
-  import { UploadFilled } from '@element-plus/icons-vue';
-  import {
-    downloadExcelTemplate,
-    downloadWordTemplate,
-    beforeExcelUpload,
-    beforeWordUpload,
-  } from './utils/fileUtils';
-  import {
-    parseExcel,
-    readWordTemplate,
-  } from './utils/documentUtils';
-  import { generateDocx } from './utils/docxGenerator';
+import { ref, computed } from 'vue';
+import { useI18n } from 'vue-i18n';
+import { ElMessage, ElNotification } from 'element-plus';
+import { saveAs } from 'file-saver';
+import JSZip from 'jszip';
+import { UploadFilled } from '@element-plus/icons-vue';
+import {
+  downloadExcelTemplate,
+  downloadWordTemplate,
+  beforeExcelUpload,
+  beforeWordUpload,
+} from './utils/fileUtils';
+import { parseExcel, readWordTemplate } from './utils/documentUtils';
+import { generateDocx } from './utils/docxGenerator';
 
-  // 文件状态
-  const excelFile = ref(null);
-  const wordFile = ref(null);
-  const generating = ref(false);
-  const progress = ref(0);
-  const progressText = ref('');
-  // 导出格式，默认docx
-  const exportFormat = ref('docx');
-  // Office是否安装
-  const officeInstalled = ref(false);
-  const disabled = computed(() => {
-    return (
-      !excelFile.value ||
-      !wordFile.value ||
-      generating.value ||
-      (exportFormat.value === 'pdf' && !officeInstalled.value)
-    );
-  });
+const { t } = useI18n();
 
-  // 检查Office是否安装
-  const checkOfficeInstallation = async () => {
-    try {
-      if (window.electronAPI && window.electronAPI.checkOfficeInstallation) {
-        officeInstalled.value =
-          await window.electronAPI.checkOfficeInstallation();
-      }
-    } catch (error) {
-      officeInstalled.value = false;
+// 文件状态
+const excelFile = ref(null);
+const wordFile = ref(null);
+const generating = ref(false);
+const progress = ref(0);
+const progressText = ref('');
+// 导出格式，默认docx
+const exportFormat = ref('docx');
+// Office是否安装
+const officeInstalled = ref(false);
+const disabled = computed(() => {
+  return (
+    !excelFile.value ||
+    !wordFile.value ||
+    generating.value ||
+    (exportFormat.value === 'pdf' && !officeInstalled.value)
+  );
+});
+
+// 检查Office是否安装
+const checkOfficeInstallation = async () => {
+  try {
+    if (window.electronAPI && window.electronAPI.checkOfficeInstallation) {
+      officeInstalled.value =
+        await window.electronAPI.checkOfficeInstallation();
     }
-  };
+  } catch (error) {
+    officeInstalled.value = false;
+  }
+};
 
-  checkOfficeInstallation();
+checkOfficeInstallation();
 
-  const handleExcelChange = file => {
-    excelFile.value = file.raw;
-  };
+const handleExcelChange = file => {
+  excelFile.value = file.raw;
+};
 
-  const handleWordChange = file => {
-    wordFile.value = file.raw;
-  };
+const handleWordChange = file => {
+  wordFile.value = file.raw;
+};
 
-  // 开始生成
-  const startGenerate = async () => {
-    if (!excelFile.value || !wordFile.value) {
-      ElMessage.warning('请先上传Excel文件和Word模板文件');
-      return;
-    }
+// 开始生成
+const startGenerate = async () => {
+  if (!excelFile.value || !wordFile.value) {
+    ElMessage.warning(t('generate.uploadFirst'));
+    return;
+  }
 
-    generating.value = true;
-    progress.value = 0;
-    progressText.value = '准备中...';
+  generating.value = true;
+  progress.value = 0;
+  progressText.value = t('progress.preparing');
 
-    const startTime = Date.now();
+  const startTime = Date.now();
 
-    let progressListener = null;
+  let progressListener = null;
 
-    try {
-      // [{XXX01:'xxx',XXX02:'xxx',......} , ....]
-      const excelData = await parseExcel(excelFile.value);
-      // arraybuffer
-      const wordTemplate = await readWordTemplate(wordFile.value);
-      const zip = new JSZip();
+  try {
+    // [{XXX01:'xxx',XXX02:'xxx',......} , ....]
+    const excelData = await parseExcel(excelFile.value);
+    // arraybuffer
+    const wordTemplate = await readWordTemplate(wordFile.value);
+    const zip = new JSZip();
 
-      // 如果是 PDF 模式，使用流式处理
-      if (exportFormat.value === 'pdf') {
-        progressText.value = '正在生成Word文档并转换PDF...';
+    // 如果是 PDF 模式，使用流式处理
+    if (exportFormat.value === 'pdf') {
+      progressText.value = t('progress.generatingAndConverting');
 
-        // 监听PDF转换进度
-        progressListener = window.electronAPI.onPdfProgress(data => {
-          if (data.stage === 'converting') {
-            progress.value = Math.round(50 + (data.progress || 0) * 0.4);
-            progressText.value = data.message || '正在转换PDF...';
-          }
-        });
-
-        const BATCH_SIZE = 10;
-        const pdfResults = [];
-
-        for (let i = 0; i < excelData.length; i += BATCH_SIZE) {
-          const batch = excelData.slice(i, i + BATCH_SIZE);
-          const batchDocxList = [];
-
-          for (let j = 0; j < batch.length; j++) {
-            const rowData = batch[j];
-            const globalIndex = i + j;
-
-            progress.value = Math.round((globalIndex / excelData.length) * 50);
-            progressText.value = `正在生成Word文档 (${globalIndex + 1}/${
-              excelData.length
-            })...`;
-
-            const docx = generateDocx(wordTemplate, rowData, globalIndex);
-            batchDocxList.push(docx);
-          }
-
-          progressText.value = `正在转换PDF (${i + 1}-${Math.min(
-            i + BATCH_SIZE,
-            excelData.length
-          )}/${excelData.length})...`;
-
-          const result = await window.electronAPI.convertBatchToPdf(
-            batchDocxList
-          );
-
-          if (result.success) {
-            pdfResults.push(...result.results);
-            progress.value = Math.round(
-              ((i + BATCH_SIZE) / excelData.length) * 90
-            );
-          } else {
-            throw new Error(result.error);
-          }
+      // 监听PDF转换进度
+      progressListener = window.electronAPI.onPdfProgress(data => {
+        if (data.stage === 'converting') {
+          progress.value = Math.round(50 + (data.progress || 0) * 0.4);
+          progressText.value = data.message || t('progress.convertingPdf');
         }
-
-        progressText.value = '正在打包PDF文件...';
-
-        pdfResults.forEach(pdfFile => {
-          zip.file(pdfFile.name, pdfFile.data);
-        });
-      } else {
-        // Word 模式：直接生成
-        for (let i = 0; i < excelData.length; i++) {
-          progress.value = Math.round((i / excelData.length) * 90);
-          progressText.value = `正在处理第 ${i + 1} 行，共 ${
-            excelData.length
-          } 行`;
-
-          const rowData = excelData[i];
-          const docx = generateDocx(wordTemplate, rowData, i);
-
-          zip.file(docx.name, docx.buffer);
-        }
-      }
-
-      progressText.value = '正在打包文件...';
-
-      // 生成ZIP文件
-      const zipBlob = await zip.generateAsync({ type: 'blob' });
-
-      // 生成ZIP文件名
-      const zipFileName =
-        exportFormat.value === 'docx'
-          ? '生成的Word文件.zip'
-          : '生成的PDF文件.zip';
-
-      // 下载ZIP文件
-      saveAs(zipBlob, zipFileName);
-
-      const endTime = Date.now();
-      const elapsedSeconds = Math.round((endTime - startTime) / 1000);
-
-      ElNotification.success({
-        title: '成功',
-        message: `已生成 ${excelData.length} 个${
-          exportFormat.value === 'docx' ? 'Word' : 'PDF'
-        }文件，已打包下载。耗时: ${elapsedSeconds}秒`,
-        duration: 3000,
       });
-    } catch (error) {
-      console.error('生成失败:', error);
-      ElMessage.error(`生成失败: ${error.message}`);
-    } finally {
-      if (progressListener) {
-        progressListener();
+
+      const BATCH_SIZE = 10;
+      const pdfResults = [];
+
+      for (let i = 0; i < excelData.length; i += BATCH_SIZE) {
+        const batch = excelData.slice(i, i + BATCH_SIZE);
+        const batchDocxList = [];
+
+        for (let j = 0; j < batch.length; j++) {
+          const rowData = batch[j];
+          const globalIndex = i + j;
+
+          progress.value = Math.round((globalIndex / excelData.length) * 50);
+          progressText.value = t('progress.generatingWord', {
+            current: globalIndex + 1,
+            total: excelData.length,
+          });
+
+          const docx = generateDocx(wordTemplate, rowData, globalIndex);
+          batchDocxList.push(docx);
+        }
+
+        progressText.value = t('progress.convertingPdfBatch', {
+          start: i + 1,
+          end: Math.min(i + BATCH_SIZE, excelData.length),
+          total: excelData.length,
+        });
+
+        const result =
+          await window.electronAPI.convertBatchToPdf(batchDocxList);
+
+        if (result.success) {
+          pdfResults.push(...result.results);
+          progress.value = Math.round(
+            ((i + BATCH_SIZE) / excelData.length) * 90,
+          );
+        } else {
+          throw new Error(result.error);
+        }
       }
-      generating.value = false;
-      progress.value = 0;
-      progressText.value = '';
+
+      progressText.value = t('progress.packagingPdf');
+
+      pdfResults.forEach(pdfFile => {
+        zip.file(pdfFile.name, pdfFile.data);
+      });
+    } else {
+      // Word 模式：直接生成
+      for (let i = 0; i < excelData.length; i++) {
+        progress.value = Math.round((i / excelData.length) * 90);
+        progressText.value = t('progress.processingRow', {
+          current: i + 1,
+          total: excelData.length,
+        });
+
+        const rowData = excelData[i];
+        const docx = generateDocx(wordTemplate, rowData, i);
+
+        zip.file(docx.name, docx.buffer);
+      }
     }
-  };
+
+    progressText.value = t('progress.packaging');
+
+    // 生成ZIP文件
+    const zipBlob = await zip.generateAsync({ type: 'blob' });
+
+    // 生成ZIP文件名
+    const zipFileName =
+      exportFormat.value === 'docx'
+        ? t('result.wordZipName')
+        : t('result.pdfZipName');
+
+    // 下载ZIP文件
+    saveAs(zipBlob, zipFileName);
+
+    const endTime = Date.now();
+    const elapsedSeconds = Math.round((endTime - startTime) / 1000);
+
+    ElNotification.success({
+      title: t('result.successTitle'),
+      message: t('result.successMessage', {
+        count: excelData.length,
+        format: exportFormat.value === 'docx' ? 'Word' : 'PDF',
+        seconds: elapsedSeconds,
+      }),
+      duration: 3000,
+    });
+  } catch (error) {
+    console.error('生成失败:', error);
+    ElMessage.error(t('generate.failed', { message: error.message }));
+  } finally {
+    if (progressListener) {
+      progressListener();
+    }
+    generating.value = false;
+    progress.value = 0;
+    progressText.value = '';
+  }
+};
 </script>
 
 <style>
-  .app-container {
-    max-width: 1000px;
-    margin: 0 auto;
-    padding: 20px;
-    font-family: Arial, sans-serif;
-    background-color: #f5f7fa;
-    min-height: 100vh;
-  }
+.app-container {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 20px;
+  font-family: Arial, sans-serif;
+  background-color: #f5f7fa;
+  min-height: 100vh;
+}
 
-  .title {
-    text-align: center;
-    color: #333;
-    margin-bottom: 30px;
-    font-size: 28px;
-    font-weight: 600;
-  }
+.title {
+  text-align: center;
+  color: #333;
+  margin-bottom: 30px;
+  font-size: 28px;
+  font-weight: 600;
+}
 
-  .card-container {
-    display: flex;
-    flex-direction: column;
-    gap: 20px;
-  }
+.card-container {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
 
-  .upload-card {
-    box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
-  }
+.upload-card {
+  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
+}
 
-  .card-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    font-weight: bold;
-    color: #333;
-  }
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-weight: bold;
+  color: #333;
+}
 
-  .operation-card {
-    display: flex;
-    flex-direction: column;
-    gap: 20px;
-    align-items: center;
-    padding: 30px;
-    box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
-  }
+.operation-card {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  align-items: center;
+  padding: 30px;
+  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
+}
 
-  .template-download {
-    display: flex;
-    gap: 10px;
-    margin-bottom: 10px;
-  }
+.template-download {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 10px;
+}
 
-  .export-options {
-    margin-bottom: 10px;
-  }
+.export-options {
+  margin-bottom: 10px;
+}
 
-  .export-options .el-radio-group {
-    display: flex;
-    gap: 10px;
-  }
+.export-options .el-radio-group {
+  display: flex;
+  gap: 10px;
+}
 
-  .progress-container {
-    width: 100%;
-    max-width: 500px;
-  }
+.progress-container {
+  width: 100%;
+  max-width: 500px;
+}
 
-  .progress-text {
-    text-align: center;
-    margin-top: 10px;
-    color: #606266;
-    font-size: 14px;
-  }
+.progress-text {
+  text-align: center;
+  margin-top: 10px;
+  color: #606266;
+  font-size: 14px;
+}
 
-  :deep(.el-upload-dragger) {
-    width: 100%;
-    height: 200px;
-  }
+:deep(.el-upload-dragger) {
+  width: 100%;
+  height: 200px;
+}
 
-  :deep(.el-upload__tip) {
-    text-align: center;
-  }
+:deep(.el-upload__tip) {
+  text-align: center;
+}
 </style>

@@ -1,5 +1,23 @@
 import { read, utils } from 'xlsx';
 
+import { t } from '../i18n';
+
+// 英文月份缩写，用于英文日期格式
+const MONTH_SHORT_NAMES = [
+  'Jan',
+  'Feb',
+  'Mar',
+  'Apr',
+  'May',
+  'Jun',
+  'Jul',
+  'Aug',
+  'Sep',
+  'Oct',
+  'Nov',
+  'Dec',
+];
+
 export const parseExcel = file => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -12,11 +30,7 @@ export const parseExcel = file => {
         const jsonData = utils.sheet_to_json(worksheet, { header: 1 });
 
         if (jsonData.length < 3) {
-          reject(
-            new Error(
-              'Excel表格格式不正确，需要包含描述行、表头行和至少一行数据'
-            )
-          );
+          reject(new Error(t('error.excelFormat')));
           return;
         }
 
@@ -24,11 +38,13 @@ export const parseExcel = file => {
         const rows = jsonData
           .slice(2)
           .filter(row =>
-            row.some(cell => cell !== undefined && cell !== null && cell !== '')
+            row.some(
+              cell => cell !== undefined && cell !== null && cell !== '',
+            ),
           );
 
         if (rows.length === 0) {
-          reject(new Error('Excel表格中未检测到有效数据行'));
+          reject(new Error(t('error.excelNoData')));
           return;
         }
 
@@ -40,12 +56,12 @@ export const parseExcel = file => {
             if (typeof value === 'number') {
               if (value > 25569) {
                 const date = new Date((value - 25569) * 86400000);
-                value = `${date.getFullYear()}年${(date.getMonth() + 1)
-                  .toString()
-                  .padStart(2, '0')}月${date
-                  .getDate()
-                  .toString()
-                  .padStart(2, '0')}日`;
+                value = t('format.date', {
+                  year: date.getFullYear(),
+                  month: (date.getMonth() + 1).toString().padStart(2, '0'),
+                  day: date.getDate().toString().padStart(2, '0'),
+                  monthShort: MONTH_SHORT_NAMES[date.getMonth()],
+                });
               } else if (value > 0 && value < 1) {
                 const hours = Math.floor(value * 24);
                 const minutes = Math.floor((value * 24 * 60) % 60);
@@ -63,10 +79,10 @@ export const parseExcel = file => {
 
         resolve(formattedRows);
       } catch (error) {
-        reject(new Error('Excel文件解析失败'));
+        reject(new Error(t('error.excelParseFailed')));
       }
     };
-    reader.onerror = () => reject(new Error('文件读取失败'));
+    reader.onerror = () => reject(new Error(t('error.fileReadFailed')));
     reader.readAsArrayBuffer(file);
   });
 };
@@ -122,7 +138,7 @@ export const processCheckboxOptions = (content, rowData) => {
           const isSelected = selectedValues.some(
             selectedValue =>
               nextText.includes(selectedValue) ||
-              selectedValue.includes(nextText)
+              selectedValue.includes(nextText),
           );
 
           if (isSelected) {
@@ -134,7 +150,7 @@ export const processCheckboxOptions = (content, rowData) => {
       }
 
       return result.join('');
-    }
+    },
   );
 
   return updatedContent;
@@ -148,10 +164,10 @@ export const readWordTemplate = file => {
         const content = e.target.result;
         resolve(content);
       } catch (error) {
-        reject(new Error('Word模板读取失败'));
+        reject(new Error(t('error.wordReadFailed')));
       }
     };
-    reader.onerror = () => reject(new Error('文件读取失败'));
+    reader.onerror = () => reject(new Error(t('error.fileReadFailed')));
     reader.readAsArrayBuffer(file);
   });
 };
