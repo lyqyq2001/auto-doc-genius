@@ -133,7 +133,7 @@ import {
   beforeWordUpload,
 } from './utils/fileUtils';
 import { parseExcel, readWordTemplate } from './utils/documentUtils';
-import { generateDocx } from './utils/docxGenerator';
+import { generateDocx, resolveDuplicateName } from './utils/docxGenerator';
 import { isImageColumn, collectImagePaths } from './utils/imageUtils';
 
 const { t } = useI18n();
@@ -252,6 +252,10 @@ const startGenerate = async () => {
 
     const zip = new JSZip();
 
+    // 输出文件名去重：重名文件自动追加序号，避免在ZIP中互相覆盖
+    const usedFileNames = new Set();
+    let renamedCount = 0;
+
     // 如果是 PDF 模式，使用流式处理
     if (exportFormat.value === 'pdf') {
       progressText.value = t('progress.generatingAndConverting');
@@ -288,7 +292,9 @@ const startGenerate = async () => {
             imageAssets,
             excelDir,
           );
-          batchDocxList.push(docx);
+          const uniqueName = resolveDuplicateName(docx.name, usedFileNames);
+          if (uniqueName !== docx.name) renamedCount += 1;
+          batchDocxList.push({ ...docx, name: uniqueName });
         }
 
         progressText.value = t('progress.convertingPdfBatch', {
@@ -333,7 +339,9 @@ const startGenerate = async () => {
           excelDir,
         );
 
-        zip.file(docx.name, docx.buffer);
+        const uniqueName = resolveDuplicateName(docx.name, usedFileNames);
+        if (uniqueName !== docx.name) renamedCount += 1;
+        zip.file(uniqueName, docx.buffer);
       }
     }
 
@@ -350,6 +358,14 @@ const startGenerate = async () => {
 
     // 下载ZIP文件
     saveAs(zipBlob, zipFileName);
+
+    if (renamedCount > 0) {
+      ElNotification.warning({
+        title: t('result.duplicateTitle'),
+        message: t('result.duplicateFiles', { count: renamedCount }),
+        duration: 5000,
+      });
+    }
 
     const endTime = Date.now();
     const elapsedSeconds = Math.round((endTime - startTime) / 1000);

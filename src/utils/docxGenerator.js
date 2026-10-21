@@ -3,6 +3,30 @@ import Docxtemplater from 'docxtemplater';
 import { processCheckboxOptions } from './documentUtils';
 import { injectImages, isImageColumn } from './imageUtils';
 
+// 清洗文件名中的非法字符（Windows 文件名限制）
+export const sanitizeFileName = name =>
+  String(name ?? '')
+    // eslint-disable-next-line no-control-regex
+    .replace(/[\\/:*?"<>|\u0000-\u001f]/g, '_')
+    .trim();
+
+// 重名时追加 _2、_3 等序号，返回不重复的名称并登记到 usedNames
+export const resolveDuplicateName = (name, usedNames) => {
+  const dotIndex = name.lastIndexOf('.');
+  const base = dotIndex === -1 ? name : name.slice(0, dotIndex);
+  const ext = dotIndex === -1 ? '' : name.slice(dotIndex);
+
+  let uniqueName = name;
+  let suffix = 2;
+  while (usedNames.has(uniqueName)) {
+    uniqueName = `${base}_${suffix}${ext}`;
+    suffix += 1;
+  }
+
+  usedNames.add(uniqueName);
+  return uniqueName;
+};
+
 export const generateDocx = (
   wordTemplate,
   rowData,
@@ -51,7 +75,8 @@ export const generateDocx = (
   });
 
   const firstKey = Object.keys(rowData)[0];
-  const baseFileName = rowData[firstKey] || `doc_${index + 1}`;
+  const baseFileName =
+    sanitizeFileName(rowData[firstKey]) || `doc_${index + 1}`;
 
   return {
     buffer: docxArrayBuffer,

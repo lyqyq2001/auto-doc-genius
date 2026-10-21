@@ -1,4 +1,4 @@
-import { read, utils } from 'xlsx';
+import { read, utils, SSF } from 'xlsx';
 
 import { t } from '../i18n';
 
@@ -18,13 +18,38 @@ const MONTH_SHORT_NAMES = [
   'Dec',
 ];
 
+// 数据行从第3行开始（0基索引为2）
+const DATA_START_ROW = 2;
+
+// Excel日期序列号转Date（1900日期系统）
+const serialToDate = serial => new Date((serial - 25569) * 86400000);
+
+// 按当前语言格式化日期
+const formatDate = date =>
+  t('format.date', {
+    year: date.getFullYear(),
+    month: (date.getMonth() + 1).toString().padStart(2, '0'),
+    day: date.getDate().toString().padStart(2, '0'),
+    monthShort: MONTH_SHORT_NAMES[date.getMonth()],
+  });
+
+// Excel时间小数（0~1）转 HH:MM
+const formatTime = timeValue => {
+  const hours = Math.floor(timeValue * 24);
+  const minutes = Math.floor((timeValue * 24 * 60) % 60);
+  return `${hours.toString().padStart(2, '0')}:${minutes
+    .toString()
+    .padStart(2, '0')}`;
+};
+
 export const parseExcel = file => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = e => {
       try {
         const data = new Uint8Array(e.target.result);
-        const workbook = read(data, { type: 'array' });
+        // cellNF: 读取单元格数字格式（cell.z），用于判断日期/时间单元格
+        const workbook = read(data, { type: 'array', cellNF: true });
         const firstSheetName = workbook.SheetNames[0];
         const worksheet = workbook.Sheets[firstSheetName];
         const jsonData = utils.sheet_to_json(worksheet, { header: 1 });
@@ -35,39 +60,43 @@ export const parseExcel = file => {
         }
 
         const headers = jsonData[1];
-        const rows = jsonData
-          .slice(2)
-          .filter(row =>
-            row.some(
-              cell => cell !== undefined && cell !== null && cell !== '',
-            ),
-          );
+        // 过滤空行时保留工作表行号，便于按单元格地址回查格式
+        const dataRows = [];
+        for (let r = DATA_START_ROW; r < jsonData.length; r++) {
+          const row = jsonData[r];
+          if (
+            row &&
+            row.some(cell => cell !== undefined && cell !== null && cell !== '')
+          ) {
+            dataRows.push({ row, sheetRow: r });
+          }
+        }
 
-        if (rows.length === 0) {
+        if (dataRows.length === 0) {
           reject(new Error(t('error.excelNoData')));
           return;
         }
 
-        const formattedRows = rows.map(row => {
+        const formattedRows = dataRows.map(({ row, sheetRow }) => {
           const obj = {};
           headers.forEach((header, index) => {
             let value = row[index] || '';
 
-            if (typeof value === 'number') {
-              if (value > 25569) {
-                const date = new Date((value - 25569) * 86400000);
-                value = t('format.date', {
-                  year: date.getFullYear(),
-                  month: (date.getMonth() + 1).toString().padStart(2, '0'),
-                  day: date.getDate().toString().padStart(2, '0'),
-                  monthShort: MONTH_SHORT_NAMES[date.getMonth()],
-                });
-              } else if (value > 0 && value < 1) {
-                const hours = Math.floor(value * 24);
-                const minutes = Math.floor((value * 24 * 60) % 60);
-                value = `${hours.toString().padStart(2, '0')}:${minutes
-                  .toString()
-                  .padStart(2, '0')}`;
+            if (value instanceof Date) {
+              value = formatDate(value);
+            } else if (typeof value === 'number') {
+              // 仅当单元格本身是日期/时间格式时才转换，
+              // 避免把普通大数字（重量、编号等）误判为日期
+              const cell =
+                worksheet[utils.encode_cell({ r: sheetRow, c: index })];
+              const cellFormat = cell && cell.z;
+
+              if (cellFormat && SSF.is_date(cellFormat)) {
+                if (value > 0 && value < 1) {
+                  value = formatTime(value);
+                } else if (value >= 1) {
+                  value = formatDate(serialToDate(value));
+                }
               }
             }
 

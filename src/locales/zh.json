@@ -40,7 +40,9 @@
     "wordZipName": "生成的Word文件.zip",
     "pdfZipName": "生成的PDF文件.zip",
     "successTitle": "成功",
-    "successMessage": "已生成 {count} 个{format}文件，已打包下载。耗时: {seconds}秒"
+    "successMessage": "已生成 {count} 个{format}文件，已打包下载。耗时: {seconds}秒",
+    "duplicateTitle": "存在重名文件",
+    "duplicateFiles": "有 {count} 个文件因名称重复，已自动添加序号后缀（如 _2、_3）以避免互相覆盖"
   },
   "image": {
     "missingTitle": "部分图片未能加载",

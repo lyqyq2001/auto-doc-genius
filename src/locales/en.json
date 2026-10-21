@@ -40,7 +40,9 @@
     "wordZipName": "Generated Word Files.zip",
     "pdfZipName": "Generated PDF Files.zip",
     "successTitle": "Success",
-    "successMessage": "Generated {count} {format} file(s), packaged for download. Time elapsed: {seconds}s"
+    "successMessage": "Generated {count} {format} file(s), packaged for download. Time elapsed: {seconds}s",
+    "duplicateTitle": "Duplicate file names detected",
+    "duplicateFiles": "{count} file(s) had duplicate names and were automatically suffixed (e.g., _2, _3) to avoid overwriting each other"
   },
   "image": {
     "missingTitle": "Some images could not be loaded",
