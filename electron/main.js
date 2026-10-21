@@ -40,7 +40,7 @@ async function convertPdfByOffice(docxFiles, sendProgress) {
 
     sendProgress?.({
       stage: 'init',
-      message: `准备转换 ${fileCount} 个文件...`,
+      fileCount,
     });
 
     const tempDir = path.join(os.tmpdir(), `autodocgenius_batch_${Date.now()}`);
@@ -59,7 +59,7 @@ async function convertPdfByOffice(docxFiles, sendProgress) {
 
     sendProgress?.({
       stage: 'converting',
-      message: `开始转换 ${fileCount} 个文件...`,
+      fileCount,
     });
 
     try {
@@ -72,23 +72,25 @@ async function convertPdfByOffice(docxFiles, sendProgress) {
         sendProgress?.({
           stage: 'completed',
           progress: 100,
-          message: '转换完成',
         });
         return { success: true, results: batchResult.results };
       }
 
-      const error = batchResult.error || 'PDF conversion failed';
-      sendProgress?.({ stage: 'error', message: `转换失败: ${error}` });
-      return { success: false, error };
+      const errorCode =
+        batchResult.errorCode === 'officeUnavailable'
+          ? 'officeUnavailable'
+          : 'pdfConversionFailed';
+      sendProgress?.({ stage: 'error', errorCode });
+      return { success: false, errorCode };
     } finally {
       if (fs.existsSync(tempDir)) {
         fs.rmSync(tempDir, { recursive: true, force: true });
       }
     }
   } catch (error) {
-    sendProgress?.({ stage: 'error', message: `转换失败: ${error.message}` });
+    sendProgress?.({ stage: 'error', errorCode: 'pdfConversionFailed' });
     console.error('[PDF转换] 总处理失败:', error);
-    return { success: false, error: error.message };
+    return { success: false, errorCode: 'pdfConversionFailed' };
   }
 }
 

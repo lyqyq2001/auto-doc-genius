@@ -22,6 +22,9 @@
   "generate": {
     "start": "Start Generating Reports",
     "noOffice": "(Office not installed, cannot generate PDF)",
+    "officeUnavailable": "Microsoft Word or WPS could not be started. Check that one is installed and try again.",
+    "pdfConversionFailed": "PDF conversion failed. Check the Office installation and try again.",
+    "unexpectedFailed": "An unexpected error occurred. Check the selected files and try again.",
     "uploadFirst": "Please upload the Excel file and Word template file first",
     "failed": "Generation failed: {message}"
   },

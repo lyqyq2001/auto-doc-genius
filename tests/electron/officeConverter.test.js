@@ -105,6 +105,7 @@ describe('convertBatchWordToPdf', () => {
 
     await expect(convertBatchWordToPdf(pairs)).resolves.toMatchObject({
       success: false,
+      errorCode: 'pdfConversionFailed',
       error: 'PowerShell failed',
     });
     expect(fs.existsSync(path.dirname(scriptPath))).toBe(false);
@@ -125,6 +126,22 @@ describe('convertBatchWordToPdf', () => {
     await expect(convertBatchWordToPdf(pairs)).resolves.toEqual({
       success: true,
       results: [{ name: 'first.pdf', data: Buffer.from('first pdf') }],
+    });
+  });
+
+  it('returns the stable officeUnavailable code when PowerShell reports no Office installation', async () => {
+    const pair = {
+      input: 'input.docx',
+      output: path.join(makeTempDir(), 'output.pdf'),
+    };
+    const exec = vi.fn((_command, _options, callback) =>
+      callback(null, 'BATCH_CONVERSION_PARTIAL_SUCCESS\nOFFICE_UNAVAILABLE', ''),
+    );
+    const { convertBatchWordToPdf } = loadOfficeConverter(exec);
+
+    await expect(convertBatchWordToPdf([pair])).resolves.toMatchObject({
+      success: false,
+      errorCode: 'officeUnavailable',
     });
   });
 });

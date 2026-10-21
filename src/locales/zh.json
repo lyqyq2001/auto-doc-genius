@@ -22,6 +22,9 @@
   "generate": {
     "start": "开始生成报告",
     "noOffice": "(未安装Office，无法生成PDF)",
+    "officeUnavailable": "无法启动 Microsoft Word 或 WPS，请确认已安装其中一个后重试。",
+    "pdfConversionFailed": "PDF 转换失败，请检查 Office 安装后重试。",
+    "unexpectedFailed": "发生意外错误，请检查所选文件后重试。",
     "uploadFirst": "请先上传Excel文件和Word模板文件",
     "failed": "生成失败: {message}"
   },

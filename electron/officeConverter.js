@@ -65,6 +65,7 @@ ${inputOutputPairs
 $app = $null
 $appName = ""
 $results = @()
+$topLevelError = ""
 
 function ReleaseComObject($obj) {
     if ($obj) {
@@ -147,6 +148,7 @@ try {
     }
 
 } catch {
+    $topLevelError = $_.Exception.Message
     if ($doc) { 
         try { $doc.Close(0) } catch {}
         ReleaseComObject $doc
@@ -168,6 +170,9 @@ if ($successCount -eq $inputOutputPairs.Count) {
     Write-Host "BATCH_CONVERSION_SUCCESS"
 } else {
     Write-Host "BATCH_CONVERSION_PARTIAL_SUCCESS"
+}
+if ($topLevelError -match "Could not launch Microsoft Word or WPS Writer") {
+    Write-Output "OFFICE_UNAVAILABLE"
 }
 $results | ConvertTo-Json -Compress
 `;
@@ -195,7 +200,17 @@ $results | ConvertTo-Json -Compress
             if (fs.existsSync(tempDir)) {
               fs.rmSync(tempDir, { recursive: true, force: true });
             }
-            resolve({ success: false, error: error.message });
+            const officeUnavailable =
+              /OFFICE_UNAVAILABLE|Could not launch Microsoft Word or WPS Writer/i.test(
+                `${stdout || ''}\n${stderr || ''}\n${error.message}`,
+              );
+            resolve({
+              success: false,
+              errorCode: officeUnavailable
+                ? 'officeUnavailable'
+                : 'pdfConversionFailed',
+              error: error.message,
+            });
 
             return;
           }
@@ -225,6 +240,18 @@ $results | ConvertTo-Json -Compress
               fs.rmSync(tempDir, { recursive: true, force: true });
             }
 
+            if (pdfResults.length === 0) {
+              const officeUnavailable = stdout.includes('OFFICE_UNAVAILABLE');
+              resolve({
+                success: false,
+                errorCode: officeUnavailable
+                  ? 'officeUnavailable'
+                  : 'pdfConversionFailed',
+                error: officeUnavailable ? 'Office unavailable' : '转换失败',
+              });
+              return;
+            }
+
             console.log(
               `[Office 批量转换] 完成，成功转换 ${pdfResults.length}/${inputOutputPairs.length} 个文件`
             );
@@ -236,7 +263,11 @@ $results | ConvertTo-Json -Compress
               fs.rmSync(tempDir, { recursive: true, force: true });
             }
 
-            resolve({ success: false, error: '转换失败' });
+            resolve({
+              success: false,
+              errorCode: 'pdfConversionFailed',
+              error: '转换失败',
+            });
           }
         }
       );
@@ -252,7 +283,11 @@ $results | ConvertTo-Json -Compress
         } catch (cleanupError) {}
       }
 
-      resolve({ success: false, error: error.message });
+      resolve({
+        success: false,
+        errorCode: 'pdfConversionFailed',
+        error: error.message,
+      });
     }
   });
 }

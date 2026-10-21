@@ -156,7 +156,9 @@ describe('App document generation flow', () => {
     await appState(wrapper).startGenerate();
 
     await vi.waitFor(() => expect(mocks.message.error).toHaveBeenCalledOnce());
-    expect(mocks.message.error.mock.calls[0][0]).toContain('invalid workbook');
+    expect(mocks.message.error.mock.calls[0][0]).toContain(
+      i18n.global.t('generate.unexpectedFailed'),
+    );
     expect(appState(wrapper).disabled).toBe(false);
     wrapper.unmount();
   }, 20000);
@@ -188,12 +190,13 @@ describe('App document generation flow', () => {
   }, 20000);
 
   it('reports a PDF conversion failure and unregisters progress notifications', async () => {
+    i18n.global.locale.value = 'zh';
     const removeProgressListener = vi.fn();
     window.electronAPI = {
       onPdfProgress: vi.fn(() => removeProgressListener),
       convertBatchToPdf: vi.fn().mockResolvedValue({
         success: false,
-        error: 'Office conversion failed',
+        errorCode: 'officeUnavailable',
       }),
     };
     const wrapper = await mountApp();
@@ -202,7 +205,11 @@ describe('App document generation flow', () => {
     uploadBothFiles(wrapper);
     await appState(wrapper).startGenerate();
 
-    expect(mocks.message.error.mock.calls[0][0]).toContain('Office conversion failed');
+    expect(mocks.message.error.mock.calls[0][0]).toBe(
+      i18n.global.t('generate.failed', {
+        message: i18n.global.t('generate.officeUnavailable'),
+      }),
+    );
     expect(removeProgressListener).toHaveBeenCalledOnce();
     wrapper.unmount();
   }, 20000);
@@ -255,7 +262,7 @@ describe('App document generation flow', () => {
     expect(convertBatchToPdf.mock.calls[0][0][0].name).toBe('Person1.docx');
     expect(convertBatchToPdf.mock.calls[1][0][0].name).toBe('Person11.docx');
     expect(progressDuringConversion).toBe(60);
-    expect(textDuringConversion).toBe('Converting batch');
+    expect(textDuringConversion).toBe(i18n.global.t('progress.convertingPdf'));
     expect(mocks.zipEntries).toHaveLength(11);
     expect(mocks.saveAs.mock.calls[0][1]).toBe('Generated PDF Files.zip');
     wrapper.unmount();
@@ -321,7 +328,10 @@ describe('App document generation flow', () => {
     uploadBothFiles(wrapper);
     await appState(wrapper).startGenerate();
 
-    expect(mocks.message.error.mock.calls[0][0]).toContain('disk read failed');
+    expect(mocks.message.error.mock.calls[0][0]).toContain(
+      i18n.global.t('generate.unexpectedFailed'),
+    );
+    expect(mocks.message.error.mock.calls[0][0]).not.toContain('disk read failed');
     expect(mocks.generateDocx).not.toHaveBeenCalled();
     expect(appState(wrapper).generating).toBe(false);
     wrapper.unmount();

@@ -264,7 +264,7 @@ const startGenerate = async () => {
       progressListener = window.electronAPI.onPdfProgress(data => {
         if (data.stage === 'converting') {
           progress.value = Math.round(50 + (data.progress || 0) * 0.4);
-          progressText.value = data.message || t('progress.convertingPdf');
+          progressText.value = t('progress.convertingPdf');
         }
       });
 
@@ -306,13 +306,17 @@ const startGenerate = async () => {
         const result =
           await window.electronAPI.convertBatchToPdf(batchDocxList);
 
-        if (result.success) {
+        if (result?.success) {
           pdfResults.push(...result.results);
           progress.value = Math.round(
             ((i + BATCH_SIZE) / excelData.length) * 90,
           );
         } else {
-          throw new Error(result.error);
+          const errorKey =
+            result?.errorCode === 'officeUnavailable'
+              ? 'generate.officeUnavailable'
+              : 'generate.pdfConversionFailed';
+          throw new Error(t(errorKey));
         }
       }
 
@@ -381,7 +385,23 @@ const startGenerate = async () => {
     });
   } catch (error) {
     console.error('生成失败:', error);
-    ElMessage.error(t('generate.failed', { message: error.message }));
+    const knownErrorKeys = [
+      'error.excelFormat',
+      'error.excelNoData',
+      'error.excelParseFailed',
+      'error.fileReadFailed',
+      'error.wordReadFailed',
+      'generate.officeUnavailable',
+      'generate.pdfConversionFailed',
+    ];
+    const knownMessage = knownErrorKeys
+      .map(key => t(key))
+      .find(message => message === error?.message);
+    ElMessage.error(
+      t('generate.failed', {
+        message: knownMessage || t('generate.unexpectedFailed'),
+      }),
+    );
   } finally {
     if (progressListener) {
       progressListener();

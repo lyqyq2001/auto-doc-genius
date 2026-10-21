@@ -130,6 +130,7 @@ describe('Electron main IPC handlers', () => {
     expect(result.results[0].name).toBe('result.pdf');
     expect(converter).toHaveBeenCalledOnce();
     expect(sent.map(item => item.data.stage)).toEqual(['init', 'converting', 'completed']);
+    expect(sent.every(item => !('message' in item.data))).toBe(true);
     expect(sent.every(item => item.channel === 'pdf-conversion-progress')).toBe(true);
     expect(fs.existsSync(path.dirname(inputPairs[0].input))).toBe(false);
   });
@@ -148,7 +149,7 @@ describe('Electron main IPC handlers', () => {
       handlers.get('batch-convert-pdf')(event, [
         { name: 'report.docx', buffer: new Uint8Array([1]) },
       ]),
-    ).resolves.toEqual({ success: false, error: 'converter unavailable' });
+    ).resolves.toEqual({ success: false, errorCode: 'pdfConversionFailed' });
 
     expect(fs.existsSync(path.dirname(inputPairs[0].input))).toBe(false);
     expect(sent.at(-1)).toMatchObject({ stage: 'error' });
@@ -158,7 +159,11 @@ describe('Electron main IPC handlers', () => {
     let inputPairs;
     const converter = vi.fn(async pairs => {
       inputPairs = pairs;
-      return { success: false, error: 'Office is unavailable' };
+      return {
+        success: false,
+        errorCode: 'officeUnavailable',
+        error: 'Office is unavailable',
+      };
     });
     const { handlers } = createMainHarness({ convertBatchWordToPdf: converter });
     const sent = [];
@@ -168,7 +173,7 @@ describe('Electron main IPC handlers', () => {
       handlers.get('batch-convert-pdf')(event, [
         { name: 'report.docx', buffer: new Uint8Array([1]) },
       ]),
-    ).resolves.toEqual({ success: false, error: 'Office is unavailable' });
+    ).resolves.toEqual({ success: false, errorCode: 'officeUnavailable' });
 
     expect(fs.existsSync(path.dirname(inputPairs[0].input))).toBe(false);
     expect(sent.at(-1)).toMatchObject({ stage: 'error' });
