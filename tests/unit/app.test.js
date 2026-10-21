@@ -22,7 +22,9 @@ vi.mock('element-plus', () => {
     ElNotification: notifyMock,
     // 模板编译产物引用这些命名导出，提供最小 stub
     ElIcon: stub('i'),
-    ElCard: stub(),
+    ElCard: {
+      template: '<div><slot name="header" /><slot /><slot name="footer" /></div>',
+    },
     ElUpload: stub(),
     ElButton: stub('button'),
     ElRadioGroup: stub(),
@@ -58,7 +60,9 @@ const mountApp = () =>
       plugins: [i18n],
       stubs: {
         // 覆盖 mock 中提供的占位实现，使用可交互的轻量 stub
-        ElCard: { template: '<div><slot name="header" /><slot /></div>' },
+        ElCard: {
+          template: '<div><slot name="header" /><slot /><slot name="footer" /></div>',
+        },
         ElUpload: uploadStub,
         ElIcon: { template: '<i><slot /></i>' },
         ElButton: {
@@ -80,6 +84,8 @@ const mountApp = () =>
     },
   });
 
+const appState = wrapper => wrapper.vm.$.setupState;
+
 beforeEach(() => {
   vi.clearAllMocks();
   i18n.global.locale.value = 'en';
@@ -98,66 +104,55 @@ describe('App 组件渲染', () => {
 
   it('初始状态生成按钮不可用（未上传文件）', () => {
     const wrapper = mountApp();
-
-    const buttons = wrapper.findAll('button.btn');
-    const generateBtn = buttons[buttons.length - 1];
-    expect(generateBtn.attributes('disabled')).toBeDefined();
+    expect(appState(wrapper).disabled).toBe(true);
   });
 
   it('上传 Excel 与 Word 后按钮恢复可用', async () => {
     const wrapper = mountApp();
 
     // 模拟 el-upload 的 on-change 回调
-    wrapper.vm.handleExcelChange({ raw: new File(['x'], 'data.xlsx') });
+    appState(wrapper).handleExcelChange({ raw: new File(['x'], 'data.xlsx') });
     await wrapper.vm.$nextTick();
-    let buttons = wrapper.findAll('button.btn');
-    let generateBtn = buttons[buttons.length - 1];
-    expect(generateBtn.attributes('disabled')).toBeDefined();
+    expect(appState(wrapper).disabled).toBe(true);
 
-    wrapper.vm.handleWordChange({ raw: new File(['x'], 'template.docx') });
+    appState(wrapper).handleWordChange({ raw: new File(['x'], 'template.docx') });
     await wrapper.vm.$nextTick();
-    buttons = wrapper.findAll('button.btn');
-    generateBtn = buttons[buttons.length - 1];
-    expect(generateBtn.attributes('disabled')).toBeUndefined();
+    expect(appState(wrapper).disabled).toBe(false);
   });
 
   it('未上传文件就点击生成时给出警告且不进入生成态', async () => {
     const wrapper = mountApp();
 
-    await wrapper.vm.startGenerate();
+    await appState(wrapper).startGenerate();
 
     expect(ElMessage.warning).toHaveBeenCalledWith(
       'Please upload the Excel file and Word template file first',
     );
-    expect(wrapper.vm.generating).toBe(false);
+    expect(appState(wrapper).generating).toBe(false);
   });
 
   it('选择 PDF 导出但未检测到 Office 时禁用生成按钮', async () => {
     const wrapper = mountApp();
 
-    wrapper.vm.handleExcelChange({ raw: new File(['x'], 'data.xlsx') });
-    wrapper.vm.handleWordChange({ raw: new File(['x'], 'template.docx') });
-    wrapper.vm.exportFormat = 'pdf';
-    wrapper.vm.officeInstalled = false;
+    appState(wrapper).handleExcelChange({ raw: new File(['x'], 'data.xlsx') });
+    appState(wrapper).handleWordChange({ raw: new File(['x'], 'template.docx') });
+    appState(wrapper).exportFormat = 'pdf';
+    appState(wrapper).officeInstalled = false;
     await wrapper.vm.$nextTick();
 
-    const buttons = wrapper.findAll('button.btn');
-    const generateBtn = buttons[buttons.length - 1];
-    expect(generateBtn.attributes('disabled')).toBeDefined();
+    expect(appState(wrapper).disabled).toBe(true);
   });
 
   it('Office 已安装时 PDF 模式按钮可用', async () => {
     const wrapper = mountApp();
 
-    wrapper.vm.handleExcelChange({ raw: new File(['x'], 'data.xlsx') });
-    wrapper.vm.handleWordChange({ raw: new File(['x'], 'template.docx') });
-    wrapper.vm.exportFormat = 'pdf';
-    wrapper.vm.officeInstalled = true;
+    appState(wrapper).handleExcelChange({ raw: new File(['x'], 'data.xlsx') });
+    appState(wrapper).handleWordChange({ raw: new File(['x'], 'template.docx') });
+    appState(wrapper).exportFormat = 'pdf';
+    appState(wrapper).officeInstalled = true;
     await wrapper.vm.$nextTick();
 
-    const buttons = wrapper.findAll('button.btn');
-    const generateBtn = buttons[buttons.length - 1];
-    expect(generateBtn.attributes('disabled')).toBeUndefined();
+    expect(appState(wrapper).disabled).toBe(false);
   });
 
   it('存在 electronAPI 时检查 Office 安装状态', async () => {
@@ -167,7 +162,7 @@ describe('App 组件渲染', () => {
     const wrapper = mountApp();
     // 等待组件 setup 中触发的异步检查完成
     await vi.waitFor(() => {
-      expect(wrapper.vm.officeInstalled).toBe(true);
+      expect(appState(wrapper).officeInstalled).toBe(true);
     });
   });
 });

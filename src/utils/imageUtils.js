@@ -63,11 +63,20 @@ export const resolveImagePath = (cellValue, excelDir) => {
     baseParts.push(segment);
   }
 
-  const prefix = normalizedBase.startsWith('\\\\') ? '\\\\' : '';
+  const prefix = normalizedBase.startsWith('\\\\')
+    ? '\\\\'
+    : normalizedBase.startsWith('/')
+      ? '/'
+      : '';
   const resolved = prefix + baseParts.join(sep);
 
   // 防止 .. 越权：解析结果必须仍在 Excel 目录之下
-  if (!resolved.toLowerCase().startsWith(normalizedBase.toLowerCase())) {
+  const normalizedBaseLower = normalizedBase.toLowerCase();
+  const resolvedLower = resolved.toLowerCase();
+  if (
+    resolvedLower !== normalizedBaseLower &&
+    !resolvedLower.startsWith(`${normalizedBaseLower}${sep}`)
+  ) {
     return '';
   }
 

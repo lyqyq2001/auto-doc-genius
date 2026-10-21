@@ -109,8 +109,8 @@
         <div v-if="generating" class="progress-container">
           <el-progress
             :percentage="progress"
-            :status="progress === 100 ? 'success' : 'active'"
-            stroke-width="2"
+            :status="progress === 100 ? 'success' : ''"
+            :stroke-width="2"
           />
           <div class="progress-text">{{ progressText }}</div>
         </div>

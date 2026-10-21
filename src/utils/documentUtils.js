@@ -80,7 +80,7 @@ export const parseExcel = file => {
         const formattedRows = dataRows.map(({ row, sheetRow }) => {
           const obj = {};
           headers.forEach((header, index) => {
-            let value = row[index] || '';
+            let value = row[index] ?? '';
 
             if (value instanceof Date) {
               value = formatDate(value);

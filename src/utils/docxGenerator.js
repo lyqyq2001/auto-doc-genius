@@ -154,8 +154,12 @@ export const generateDocx = (
         if (isImageColumn(key)) return;
         const regex = new RegExp(escapeRegExp(key), 'g');
         if (!updatedContent.includes(`{${key}}`)) {
-          // 使用函数替换，避免 key 中的 $ 字符被解释为替换模式
-          updatedContent = updatedContent.replace(regex, () => `{${key}}`);
+          // 只修复 Word 文本节点中的裸字段名，避免改坏 XML 属性/元数据。
+          updatedContent = updatedContent.replace(
+            /(<w:t(?:\s[^>]*)?>)([\s\S]*?)(<\/w:t>)/g,
+            (_match, openTag, text, closeTag) =>
+              `${openTag}${text.replace(regex, () => `{${key}}`)}${closeTag}`,
+          );
         }
       });
 

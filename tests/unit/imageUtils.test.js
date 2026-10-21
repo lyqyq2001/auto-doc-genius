@@ -115,9 +115,10 @@ describe('resolveImagePath', () => {
     expect(resolveImagePath('../a.png', 'C:\\data\\excel\\sub')).toBe('');
   });
 
-  it('POSIX 风格目录下的相对路径当前无法解析', () => {
-    // 已知限制：excelDir 以 "/" 开头时，前缀被 filter(Boolean) 丢弃导致越权校验失败
-    expect(resolveImagePath('imgs/a.png', '/data/excel')).toBe('');
+  it('正确解析 POSIX 风格目录下的相对路径', () => {
+    expect(resolveImagePath('imgs/a.png', '/data/excel')).toBe(
+      '/data/excel/imgs/a.png',
+    );
   });
 });
 
